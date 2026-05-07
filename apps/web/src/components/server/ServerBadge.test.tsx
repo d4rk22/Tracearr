@@ -33,10 +33,16 @@ describe('ServerBadge', () => {
     expect(root.className).toMatch(/text-muted-foreground/);
   });
 
-  it('falls back gracefully when color is null', () => {
+  it('falls back gracefully when color is null (compact variant)', () => {
     const colorless: Server = { ...server, color: null };
-    render(<ServerBadge server={colorless} />);
+    render(<ServerBadge server={colorless} variant="compact" />);
     const dot = screen.getByLabelText('Connors Plex');
     expect(dot.getAttribute('style') ?? '').not.toMatch(/background-color/);
+  });
+
+  it('marks the decorative dot in default/outlined variants as aria-hidden so the name is not double-announced', () => {
+    const { container } = render(<ServerBadge server={server} />);
+    const dot = container.querySelector('span[aria-hidden="true"]');
+    expect(dot).not.toBeNull();
   });
 });
