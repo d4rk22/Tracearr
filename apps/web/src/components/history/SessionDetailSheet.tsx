@@ -46,7 +46,6 @@ import { formatDuration } from '@/lib/formatters';
 import { getAvatarUrl } from '@/components/users/utils';
 import { useTheme } from '@/components/theme-provider';
 import { StreamDetailsPanel } from './StreamDetailsPanel';
-import { ServerColumnCell } from '@/components/server';
 
 import type {
   SessionWithDetails,
@@ -54,6 +53,7 @@ import type {
   SessionSegment,
   SessionState,
   MediaType,
+  ServerType,
 } from '@tracearr/shared';
 import { format, formatDistanceToNow } from 'date-fns';
 import { getDateTimeFormatString } from '@/lib/timeFormat';
@@ -65,6 +65,13 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Server type configuration
+const SERVER_CONFIG: Record<ServerType, { label: string; color: string }> = {
+  plex: { label: 'Plex', color: 'text-amber-500' },
+  jellyfin: { label: 'Jellyfin', color: 'text-purple-500' },
+  emby: { label: 'Emby', color: 'text-green-500' },
+};
 
 // State configuration
 const STATE_CONFIG: Record<SessionState, { icon: typeof Play; color: string; label: string }> = {
@@ -269,6 +276,7 @@ function SessionContent({ session }: { session: SessionWithDetails | ActiveSessi
     setSegmentsOpen(false);
   }
 
+  const serverConfig = SERVER_CONFIG[session.server.type];
   const stateConfig = STATE_CONFIG[session.state];
   const mediaConfig = MEDIA_CONFIG[session.mediaType];
   const MediaIcon = mediaConfig.icon;
@@ -376,7 +384,14 @@ function SessionContent({ session }: { session: SessionWithDetails | ActiveSessi
 
         {/* Server */}
         <Section icon={Server} title="Server">
-          <ServerColumnCell server={session.server} />
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Server</span>
+            <span className="flex items-center gap-1.5">
+              <span className={serverConfig.color}>{serverConfig.label}</span>
+              <span className="text-muted-foreground">·</span>
+              {session.server.name}
+            </span>
+          </div>
         </Section>
 
         {/* Playback Info */}

@@ -137,7 +137,7 @@ function BandwidthChart({
         enabled: false,
       },
       legend: {
-        enabled: isMultiServer,
+        enabled: true,
         itemStyle: {
           color: 'hsl(var(--muted-foreground))',
         },
