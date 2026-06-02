@@ -446,8 +446,9 @@ export const libraryWatchRoute: FastifyPluginAsync = async (app) => {
             SELECT
               match_key,
               -- Pick the lexicographically smallest id/server to provide a stable primary row
-              MIN(id) AS primary_id,
-              MIN(server_id) AS primary_server_id,
+              -- (id/server_id are uuid; cast to text since Postgres has no min(uuid))
+              MIN(id::text) AS primary_id,
+              MIN(server_id::text) AS primary_server_id,
               MIN(server_name) AS primary_server_name,
               MIN(library_id) AS primary_library_id,
               MIN(title) AS title,

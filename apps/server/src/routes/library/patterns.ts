@@ -229,11 +229,11 @@ export const libraryPatternsRoute: FastifyPluginAsync = async (app) => {
                 ) dsi ON ecs.show_title = dsi.show_title AND ecs.server_user_id = dsi.server_user_id
                 WHERE ecs.consecutive_episodes >= ${bingeThreshold}
                   AND EXISTS (
-                    SELECT 1 FROM sessions s
-                    JOIN server_users su ON su.id = s.server_user_id
-                    WHERE s.server_user_id = ecs.server_user_id
-                      AND s.grandparent_title = ecs.show_title
-                      AND s.started_at >= NOW() - INTERVAL '1 week' * ${periodWeeks}
+                    SELECT 1 FROM sessions sess
+                    JOIN server_users su ON su.id = sess.server_user_id
+                    WHERE sess.server_user_id = ecs.server_user_id
+                      AND sess.grandparent_title = ecs.show_title
+                      AND sess.started_at >= NOW() - INTERVAL '1 week' * ${periodWeeks}
                       ${serverFragmentSess}
                   )
                 GROUP BY ecs.show_title
