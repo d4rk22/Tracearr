@@ -83,7 +83,7 @@ function buildHistoryFilterConditions(
 
   // Resolve effective server IDs (handles owner bypass + access intersection)
   const resolvedIds = resolveServerIds(authUser, serverId, rawServerIds);
-  if (resolvedIds !== undefined && resolvedIds.length === 0) {
+  if (resolvedIds?.length === 0) {
     return null; // No accessible servers after intersection
   }
   if (resolvedIds !== undefined) {
@@ -985,7 +985,7 @@ export const sessionRoutes: FastifyPluginAsync = async (app) => {
 
     // Resolve effective server IDs (handles owner bypass + access intersection)
     const resolvedIds = resolveServerIds(authUser, serverId, rawServerIds);
-    if (resolvedIds !== undefined && resolvedIds.length === 0) {
+    if (resolvedIds?.length === 0) {
       // No accessible servers — return empty filter options
       if (includeAllCountries) {
         const emptyRulesResponse: RulesFilterOptions = {

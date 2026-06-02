@@ -111,7 +111,7 @@ export const libraryTopContentRoute: FastifyPluginAsync = async (app) => {
       const resolvedIds = resolveServerIds(authUser, serverId, serverIds);
 
       // Empty resolved set means no accessible servers match the requested filter
-      if (resolvedIds !== undefined && resolvedIds.length === 0) {
+      if (resolvedIds?.length === 0) {
         const empty: TopMoviesResponse = {
           items: [],
           summary: { totalMovies: 0, totalWatchHours: 0 },
@@ -370,7 +370,7 @@ export const libraryTopContentRoute: FastifyPluginAsync = async (app) => {
 
       const resolvedIds = resolveServerIds(authUser, serverId, serverIds);
 
-      if (resolvedIds !== undefined && resolvedIds.length === 0) {
+      if (resolvedIds?.length === 0) {
         const empty: TopShowsResponse = {
           items: [],
           summary: { totalShows: 0, totalWatchHours: 0 },

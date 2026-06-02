@@ -157,7 +157,6 @@ export const libraryDuplicatesRoute: FastifyPluginAsync = async (app) => {
 
       // resolvedIds already intersects user access with any requested serverIds
       const serverFilterSql = buildMultiServerFragment(resolvedIds);
-      const isRestricted = resolvedIds !== undefined;
 
       // Optional media type filter
       const mediaTypeFilter = mediaType ? sql`AND media_type = ${mediaType}` : sql``;

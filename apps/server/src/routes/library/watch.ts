@@ -135,7 +135,7 @@ export const libraryWatchRoute: FastifyPluginAsync = async (app) => {
 
       const resolvedIds = resolveServerIds(authUser, serverId, rawServerIds);
       // Empty resolvedIds means user has no accessible servers
-      if (resolvedIds !== undefined && resolvedIds.length === 0) {
+      if (resolvedIds?.length === 0) {
         const empty: WatchResponse = {
           items: [],
           summary: {

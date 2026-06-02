@@ -616,7 +616,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
     const conditions = [];
 
     // Short-circuit when the user has no accessible servers in the requested set
-    if (resolvedIds !== undefined && resolvedIds.length === 0) {
+    if (resolvedIds?.length === 0) {
       return { data: [], page, pageSize, total: 0, totalPages: 0 };
     }
 
@@ -1029,7 +1029,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
         body.filters.serverIds
       );
 
-      if (bulkResolvedIds !== undefined && bulkResolvedIds.length === 0) {
+      if (bulkResolvedIds?.length === 0) {
         return { success: true, acknowledged: 0 };
       }
 
@@ -1130,7 +1130,7 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
         body.filters.serverIds
       );
 
-      if (bulkResolvedIds !== undefined && bulkResolvedIds.length === 0) {
+      if (bulkResolvedIds?.length === 0) {
         return { success: true, dismissed: 0 };
       }
 
