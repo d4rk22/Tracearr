@@ -1097,21 +1097,21 @@ class ApiClient {
     // Bandwidth stats
     bandwidthDaily: async (
       timeRange?: StatsTimeRange,
-      serverId?: string,
+      serverIds?: string[],
       serverUserId?: string
     ) => {
-      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+      const params = this.buildStatsParamsMulti(timeRange ?? { period: 'month' }, serverIds);
       if (serverUserId) params.set('serverUserId', serverUserId);
       return this.request<DailyBandwidthResponse>(`/stats/bandwidth/daily?${params.toString()}`);
     },
-    bandwidthTopUsers: async (timeRange?: StatsTimeRange, serverId?: string) => {
-      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+    bandwidthTopUsers: async (timeRange?: StatsTimeRange, serverIds?: string[]) => {
+      const params = this.buildStatsParamsMulti(timeRange ?? { period: 'month' }, serverIds);
       return this.request<BandwidthTopUsersResponse>(
         `/stats/bandwidth/top-users?${params.toString()}`
       );
     },
-    bandwidthSummary: async (timeRange?: StatsTimeRange, serverId?: string) => {
-      const params = this.buildStatsParams(timeRange ?? { period: 'month' }, serverId);
+    bandwidthSummary: async (timeRange?: StatsTimeRange, serverIds?: string[]) => {
+      const params = this.buildStatsParamsMulti(timeRange ?? { period: 'month' }, serverIds);
       return this.request<BandwidthSummary>(`/stats/bandwidth/summary?${params.toString()}`);
     },
   };

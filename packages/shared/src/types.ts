@@ -1958,6 +1958,8 @@ export interface TopTranscodingUsersResponse {
 // Daily bandwidth row
 export interface DailyBandwidthRow {
   date: string;
+  /** Server this row belongs to — required for per-server chart series */
+  serverId: string;
   sessions: number;
   /** Total data transferred in bytes */
   totalBytes: number;
@@ -1984,6 +1986,8 @@ export interface BandwidthTopUser {
   /** Avatar URL from server user */
   thumbUrl: string | null;
   serverUserId: string;
+  /** Server this row belongs to — same human on two servers = two rows */
+  serverId: string;
   /** Total data transferred in bytes */
   totalBytes: number;
   /** Total data transferred in GB (human-readable) */
@@ -1998,6 +2002,22 @@ export interface BandwidthTopUser {
 // Top bandwidth users response
 export interface BandwidthTopUsersResponse {
   data: BandwidthTopUser[];
+}
+
+// Per-server KPI slice used inside BandwidthSummary.byServer
+export interface BandwidthSummaryServerKpis {
+  totalSessions: number;
+  totalBytes: number;
+  totalGb: number;
+  avgBitrate: number;
+  peakBitrate: number;
+  minBitrate: number;
+  medianBitrate: number;
+  totalDurationMs: number;
+  uniqueUsers: number;
+  avgBitrateMbps: number;
+  peakBitrateMbps: number;
+  totalHours: number;
 }
 
 // Bandwidth summary
@@ -2016,6 +2036,8 @@ export interface BandwidthSummary {
   avgBitrateMbps: number;
   peakBitrateMbps: number;
   totalHours: number;
+  /** Per-server KPI breakdown keyed by server ID (present when multiple servers selected) */
+  byServer?: Record<string, BandwidthSummaryServerKpis>;
 }
 
 // =============================================================================

@@ -20,24 +20,105 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useBandwidthDaily, useBandwidthTopUsers, useBandwidthSummary } from '@/hooks/queries';
 import { useServer } from '@/hooks/useServer';
+import { useServerColorMap } from '@/hooks/useServerColorMap';
 import { useTimeRange } from '@/hooks/useTimeRange';
 import { getAvatarUrl } from '@/components/users/utils';
 import { formatBytes } from '@/lib/formatters';
+import { ServerColumnCell } from '@/components/server';
 import type { DailyBandwidthRow } from '@tracearr/shared';
+import type { Server } from '@tracearr/shared';
 
 interface BandwidthChartProps {
   data: DailyBandwidthRow[] | undefined;
   isLoading?: boolean;
   height?: number;
   period?: 'day' | 'week' | 'month' | 'year' | 'all' | 'custom';
+  isMultiServer?: boolean;
+  selectedServers?: Pick<Server, 'id' | 'name' | 'color'>[];
 }
 
-function BandwidthChart({ data, isLoading, height = 300, period = 'month' }: BandwidthChartProps) {
+function BandwidthChart({
+  data,
+  isLoading,
+  height = 300,
+  period = 'month',
+  isMultiServer = false,
+  selectedServers = [],
+}: BandwidthChartProps) {
   const { t } = useTranslation(['pages', 'common']);
   const options = useMemo<Highcharts.Options>(() => {
     if (!data || data.length === 0) {
       return {};
     }
+
+    // Derive a stable ordered list of unique dates for the category axis
+    const dateSet = new Set(data.map((d) => d.date));
+    const categories = [...dateSet].sort();
+
+    const formatCategory = (categoryValue: string) => {
+      const date = new Date(
+        categoryValue.includes('T') ? categoryValue : categoryValue + 'T00:00:00'
+      );
+      if (isNaN(date.getTime())) return '';
+      if (period === 'year') return date.toLocaleDateString(undefined, { month: 'short' });
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    };
+
+    let bitrateSeriesArr: Highcharts.SeriesOptionsType[];
+
+    if (isMultiServer) {
+      // One stacked area per server, aligned to the shared category (date) axis
+      bitrateSeriesArr = selectedServers.map((server) => {
+        const serverRows = data.filter((r) => r.serverId === server.id);
+        const rowByDate = new Map(serverRows.map((r) => [r.date, r]));
+        return {
+          type: 'area',
+          name: server.name,
+          color: server.color ?? undefined,
+          stacking: 'normal',
+          yAxis: 0,
+          data: categories.map((date) => {
+            const row = rowByDate.get(date);
+            return row ? (row.avgBitrateMbps ?? row.avgBitrate) : null;
+          }),
+        } as Highcharts.SeriesOptionsType;
+      });
+    } else {
+      // Single-server: one area per the existing row order (one row per date)
+      bitrateSeriesArr = [
+        {
+          type: 'area',
+          name: t('statsBandwidth.avgBitrate'),
+          data: categories.map((date) => {
+            const row = data.find((d) => d.date === date);
+            return row ? (row.avgBitrateMbps ?? row.avgBitrate) : null;
+          }),
+          yAxis: 0,
+          color: 'hsl(var(--primary))',
+          fillColor: {
+            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+            stops: [
+              [0, 'hsl(var(--primary) / 0.3)'],
+              [1, 'hsl(var(--primary) / 0.05)'],
+            ],
+          },
+        } as Highcharts.SeriesOptionsType,
+      ];
+    }
+
+    // Aggregate session count across all servers per date for the right axis
+    const sessionsByDate = new Map<string, number>();
+    for (const row of data) {
+      sessionsByDate.set(row.date, (sessionsByDate.get(row.date) ?? 0) + row.sessions);
+    }
+    const sessionSeries: Highcharts.SeriesOptionsType = {
+      type: 'column',
+      name: t('common:labels.sessions'),
+      data: categories.map((date) => sessionsByDate.get(date) ?? 0),
+      yAxis: 1,
+      color: 'hsl(var(--chart-2))',
+      opacity: 0.6,
+    };
 
     return {
       chart: {
@@ -56,7 +137,7 @@ function BandwidthChart({ data, isLoading, height = 300, period = 'month' }: Ban
         enabled: false,
       },
       legend: {
-        enabled: true,
+        enabled: isMultiServer,
         itemStyle: {
           color: 'hsl(var(--muted-foreground))',
         },
@@ -65,26 +146,18 @@ function BandwidthChart({ data, isLoading, height = 300, period = 'month' }: Ban
         },
       },
       xAxis: {
-        categories: data.map((d) => d.date),
+        categories,
         labels: {
           style: {
             color: 'hsl(var(--muted-foreground))',
           },
           formatter: function () {
-            const categories = this.axis.categories;
-            const categoryValue =
-              typeof this.value === 'number' ? categories[this.value] : this.value;
+            const cats = this.axis.categories;
+            const categoryValue = typeof this.value === 'number' ? cats[this.value] : this.value;
             if (!categoryValue) return '';
-            const date = new Date(
-              categoryValue.includes('T') ? categoryValue : categoryValue + 'T00:00:00'
-            );
-            if (isNaN(date.getTime())) return '';
-            if (period === 'year') {
-              return date.toLocaleDateString(undefined, { month: 'short' });
-            }
-            return `${date.getMonth() + 1}/${date.getDate()}`;
+            return formatCategory(categoryValue);
           },
-          step: Math.ceil(data.length / 12),
+          step: Math.ceil(categories.length / 12),
         },
         lineColor: 'hsl(var(--border))',
         tickColor: 'hsl(var(--border))',
@@ -124,13 +197,6 @@ function BandwidthChart({ data, isLoading, height = 300, period = 'month' }: Ban
       ],
       plotOptions: {
         area: {
-          fillColor: {
-            linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-            stops: [
-              [0, 'hsl(var(--primary) / 0.3)'],
-              [1, 'hsl(var(--primary) / 0.05)'],
-            ],
-          },
           marker: {
             enabled: false,
             states: {
@@ -181,28 +247,12 @@ function BandwidthChart({ data, isLoading, height = 300, period = 'month' }: Ban
               point.series.name === t('statsBandwidth.avgBitrate')
                 ? `${point.y.toFixed(1)} Mbps`
                 : point.y;
-            html += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${value}</b><br/>`;
+            html += `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${value}</b><br/>`;
           });
           return html;
         },
       },
-      series: [
-        {
-          type: 'area',
-          name: t('statsBandwidth.avgBitrate'),
-          data: data.map((d) => d.avgBitrateMbps),
-          yAxis: 0,
-          color: 'hsl(var(--primary))',
-        },
-        {
-          type: 'column',
-          name: t('common:labels.sessions'),
-          data: data.map((d) => d.sessions),
-          yAxis: 1,
-          color: 'hsl(var(--chart-2))',
-          opacity: 0.6,
-        },
-      ],
+      series: [...bitrateSeriesArr, sessionSeries],
       responsive: {
         rules: [
           {
@@ -230,7 +280,7 @@ function BandwidthChart({ data, isLoading, height = 300, period = 'month' }: Ban
         ],
       },
     };
-  }, [data, height, period, t]);
+  }, [data, height, period, t, isMultiServer, selectedServers]);
 
   if (isLoading) {
     return <ChartSkeleton height={height} />;
@@ -259,15 +309,22 @@ function BandwidthChart({ data, isLoading, height = 300, period = 'month' }: Ban
 export function StatsBandwidth() {
   const { t } = useTranslation(['pages', 'common']);
   const { value: timeRange, setValue: setTimeRange, apiParams } = useTimeRange();
-  const { selectedServerId } = useServer();
+  const { selectedServerIds, selectedServers, isMultiServer } = useServer();
+  const colorMap = useServerColorMap();
 
-  const daily = useBandwidthDaily(apiParams, selectedServerId);
-  const topUsers = useBandwidthTopUsers(apiParams, selectedServerId);
-  const summary = useBandwidthSummary(apiParams, selectedServerId);
+  const daily = useBandwidthDaily(apiParams, selectedServerIds);
+  const topUsers = useBandwidthTopUsers(apiParams, selectedServerIds);
+  const summary = useBandwidthSummary(apiParams, selectedServerIds);
 
   const summaryData = summary.data;
   const users = topUsers.data?.data ?? [];
   const [dataSortDir, setDataSortDir] = useState<'asc' | 'desc'>('desc');
+
+  // Map from server id to the minimal server shape needed for ServerColumnCell
+  const serverById = useMemo(
+    () => new Map(selectedServers.map((s) => [s.id, s])),
+    [selectedServers]
+  );
 
   const rankByUserId = useMemo(() => {
     return new Map(users.map((user, index) => [user.serverUserId, index + 1]));
@@ -279,6 +336,9 @@ export function StatsBandwidth() {
       return dataSortDir === 'asc' ? diff : -diff;
     });
   }, [users, dataSortDir]);
+
+  // Resolve the first selected server id for avatar URL construction when single-server
+  const primaryServerId = selectedServerIds[0] ?? null;
 
   return (
     <div className="space-y-6">
@@ -340,6 +400,8 @@ export function StatsBandwidth() {
             isLoading={daily.isLoading}
             height={300}
             period={timeRange.period}
+            isMultiServer={isMultiServer}
+            selectedServers={selectedServers}
           />
         </CardContent>
       </Card>
@@ -363,6 +425,7 @@ export function StatsBandwidth() {
                 <TableRow>
                   <TableHead className="w-12">{t('common:labels.rank')}</TableHead>
                   <TableHead>{t('common:labels.user')}</TableHead>
+                  {isMultiServer && <TableHead>{t('common:labels.server')}</TableHead>}
                   <TableHead className="text-right">{t('common:labels.sessions')}</TableHead>
                   <TableHead className="text-right">
                     <button
@@ -385,36 +448,50 @@ export function StatsBandwidth() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedUsers.map((user, idx) => (
-                  <TableRow key={user.serverUserId}>
-                    <TableCell className="text-muted-foreground font-medium">
-                      {rankByUserId.get(user.serverUserId) ?? idx + 1}
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        to={`/users/${user.serverUserId}`}
-                        className="flex items-center gap-3 hover:underline"
-                      >
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage
-                            src={getAvatarUrl(selectedServerId, user.thumbUrl, 32) ?? undefined}
-                            alt={user.username}
-                          />
-                          <AvatarFallback>
-                            {(user.identityName ?? user.username).slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{user.identityName ?? user.username}</span>
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-right">{user.sessions.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{formatBytes(user.totalBytes)}</TableCell>
-                    <TableCell className="text-right">{user.totalHours.toFixed(1)}h</TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="outline">{user.avgBitrateMbps.toFixed(1)} Mbps</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {sortedUsers.map((user, idx) => {
+                  const serverColor = isMultiServer ? (colorMap.get(user.serverId) ?? null) : null;
+                  const rowStyle = serverColor
+                    ? { boxShadow: `inset 3px 0 0 0 ${serverColor}` }
+                    : undefined;
+                  const server = serverById.get(user.serverId);
+                  const avatarServerId = isMultiServer ? user.serverId : primaryServerId;
+
+                  return (
+                    <TableRow key={`${user.serverId}-${user.serverUserId}`} style={rowStyle}>
+                      <TableCell className="text-muted-foreground font-medium">
+                        {rankByUserId.get(user.serverUserId) ?? idx + 1}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          to={`/users/${user.serverUserId}`}
+                          className="flex items-center gap-3 hover:underline"
+                        >
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage
+                              src={getAvatarUrl(avatarServerId, user.thumbUrl, 32) ?? undefined}
+                              alt={user.username}
+                            />
+                            <AvatarFallback>
+                              {(user.identityName ?? user.username).slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{user.identityName ?? user.username}</span>
+                        </Link>
+                      </TableCell>
+                      {isMultiServer && (
+                        <TableCell>
+                          {server ? <ServerColumnCell server={server} /> : null}
+                        </TableCell>
+                      )}
+                      <TableCell className="text-right">{user.sessions.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{formatBytes(user.totalBytes)}</TableCell>
+                      <TableCell className="text-right">{user.totalHours.toFixed(1)}h</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline">{user.avgBitrateMbps.toFixed(1)} Mbps</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (

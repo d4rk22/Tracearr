@@ -220,37 +220,34 @@ export function useTopTranscodingUsers(timeRange?: StatsTimeRange, serverIds?: s
 // Bandwidth stats
 export function useBandwidthDaily(
   timeRange?: StatsTimeRange,
-  serverId?: string | null,
+  serverIds?: string[],
   serverUserId?: string
 ) {
   // Include timezone in cache key since bandwidth is grouped by local day
   const timezone = getBrowserTimezone();
+  const serverIdsKey = serverIds?.length ? [...serverIds].sort().join(',') : 'all';
   return useQuery({
-    queryKey: ['stats', 'bandwidth-daily', timeRange, serverId, serverUserId, timezone],
+    queryKey: ['stats', 'bandwidth-daily', timeRange, serverIdsKey, serverUserId, timezone],
     queryFn: () =>
-      api.stats.bandwidthDaily(
-        timeRange ?? { period: 'month' },
-        serverId ?? undefined,
-        serverUserId
-      ),
+      api.stats.bandwidthDaily(timeRange ?? { period: 'month' }, serverIds, serverUserId),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
-export function useBandwidthTopUsers(timeRange?: StatsTimeRange, serverId?: string | null) {
+export function useBandwidthTopUsers(timeRange?: StatsTimeRange, serverIds?: string[]) {
+  const serverIdsKey = serverIds?.length ? [...serverIds].sort().join(',') : 'all';
   return useQuery({
-    queryKey: ['stats', 'bandwidth-top-users', timeRange, serverId],
-    queryFn: () =>
-      api.stats.bandwidthTopUsers(timeRange ?? { period: 'month' }, serverId ?? undefined),
+    queryKey: ['stats', 'bandwidth-top-users', timeRange, serverIdsKey],
+    queryFn: () => api.stats.bandwidthTopUsers(timeRange ?? { period: 'month' }, serverIds),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
-export function useBandwidthSummary(timeRange?: StatsTimeRange, serverId?: string | null) {
+export function useBandwidthSummary(timeRange?: StatsTimeRange, serverIds?: string[]) {
+  const serverIdsKey = serverIds?.length ? [...serverIds].sort().join(',') : 'all';
   return useQuery({
-    queryKey: ['stats', 'bandwidth-summary', timeRange, serverId],
-    queryFn: () =>
-      api.stats.bandwidthSummary(timeRange ?? { period: 'month' }, serverId ?? undefined),
+    queryKey: ['stats', 'bandwidth-summary', timeRange, serverIdsKey],
+    queryFn: () => api.stats.bandwidthSummary(timeRange ?? { period: 'month' }, serverIds),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

@@ -213,6 +213,7 @@ export type {
   DailyBandwidthResponse,
   BandwidthTopUser,
   BandwidthTopUsersResponse,
+  BandwidthSummaryServerKpis,
   BandwidthSummary,
   // Library statistics
   LibraryStatsResponse,
