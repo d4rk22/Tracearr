@@ -297,25 +297,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
       - name: Install Playwright browsers
-        run: |
-          for attempt in 1 2 3; do
-            if timeout --kill-after=30 360 pnpm --filter @tracearr/e2e exec playwright install --with-deps chromium; then
-              exit 0
-            fi
-            echo "::warning::playwright install attempt $attempt failed or timed out; retrying in 10s"
-            sleep 10
-          done
-          echo "::error::playwright install failed after 3 attempts"
-          exit 1
+        run: pnpm --filter @tracearr/e2e exec playwright install --with-deps chromium
 
       - name: Build dependencies
         run: pnpm turbo run build --filter=@tracearr/shared --filter=@tracearr/translations --filter=@tracearr/test-utils
