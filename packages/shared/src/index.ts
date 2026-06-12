@@ -163,6 +163,7 @@ export type {
   PlexStatusNotification,
   PlexTranscodeNotification,
   SSEConnectionStatus,
+  ServerConnectionStatus,
   // Termination logs
   TerminationTrigger,
   TerminationLogWithDetails,

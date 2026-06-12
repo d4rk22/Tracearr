@@ -1078,6 +1078,7 @@ export interface ServerToClientEvents {
   'version:update': (data: { current: string; latest: string; releaseUrl: string }) => void;
   'server:down': (data: { serverId: string; serverName: string }) => void;
   'server:up': (data: { serverId: string; serverName: string }) => void;
+  'server:connection': (status: ServerConnectionStatus) => void;
 }
 
 export interface ClientToServerEvents {
@@ -1412,7 +1413,8 @@ export type SSEConnectionState =
   | 'connected'
   | 'reconnecting'
   | 'disconnected'
-  | 'fallback';
+  | 'fallback'
+  | 'unsupported'; // Plugin not installed on this server
 
 // Plex SSE notification container (outer wrapper)
 export interface PlexSSENotification {
@@ -1501,6 +1503,19 @@ export interface SSEConnectionStatus {
   connectedAt: Date | null;
   lastEventAt: Date | null;
   reconnectAttempts: number;
+  error: string | null;
+}
+
+// Per-server connection status surfaced to clients
+// Covers all server types (plex/jellyfin/emby) with a unified shape
+export interface ServerConnectionStatus {
+  serverId: string;
+  serverName: string;
+  serverType: ServerType;
+  mode: 'realtime' | 'polling';
+  state: SSEConnectionState;
+  lastEventAt: string | null;
+  since: string | null;
   error: string | null;
 }
 
