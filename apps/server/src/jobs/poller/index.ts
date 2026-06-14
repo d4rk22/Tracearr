@@ -38,6 +38,7 @@ export {
   stopPoller,
   triggerPoll,
   triggerReconciliationPoll,
+  triggerServerPoll,
   sweepStaleSessions,
 } from './processor.js';
 

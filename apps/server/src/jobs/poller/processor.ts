@@ -1152,7 +1152,8 @@ async function processServerSessions(
  * With SSE integration:
  * - Plex servers with active SSE connections are skipped (handled by SSE)
  * - Plex servers in fallback mode are polled
- * - Jellyfin/Emby servers are always polled (no SSE support)
+ * - Jellyfin/Emby servers without the SSE plugin are polled normally
+ * - Jellyfin/Emby servers with an active SSE plugin connection skip polling
  */
 async function pollServers(): Promise<void> {
   // Bail out if maintenance mode was activated while we were queued.
@@ -1167,19 +1168,15 @@ async function pollServers(): Promise<void> {
       return;
     }
 
-    // Filter to only servers that need polling
-    // SSE-connected Plex servers are handled by SSE, not polling
-    const serversNeedingPoll = allServers.filter((server) => {
-      // Non-Plex servers always need polling (Jellyfin/Emby don't support SSE yet)
-      if (server.type !== 'plex') {
-        return true;
-      }
-      // Plex servers in fallback mode need polling
-      return sseManager.isInFallback(server.id);
-    });
+    // Filter to only servers that need polling.
+    // SSE-connected servers (Plex or JF/Emby with plugin) are handled by SSE events.
+    // JF/Emby in unsupported/fallback state are covered by polling as normal.
+    const serversNeedingPoll = allServers.filter((server) =>
+      sseManager.isInFallback(server.id)
+    );
 
     if (serversNeedingPoll.length === 0) {
-      // All Plex servers are connected via SSE, no polling needed
+      // Every server is handled by an active SSE connection, no polling needed
       return;
     }
 
@@ -1502,6 +1499,63 @@ export function stopPoller(): void {
  */
 export async function triggerPoll(): Promise<void> {
   await pollServers();
+}
+
+/**
+ * Process a single server on demand, triggered by a plugin SSE event.
+ * Runs the same pipeline as the normal poller for that one server only.
+ */
+export async function triggerServerPoll(serverId: string): Promise<void> {
+  if (isMaintenance()) return;
+
+  try {
+    const [server] = await db.select().from(servers).where(eq(servers.id, serverId));
+    if (!server) return;
+
+    const cachedSessions = cacheService ? await cacheService.getAllActiveSessions() : [];
+    const serverTypeMap = new Map([[server.id, server.type]]);
+
+    const cachedSessionKeys = new Set(
+      cachedSessions.map((s) => {
+        const sType = serverTypeMap.get(s.serverId);
+        if (sType && sType !== 'plex') {
+          return buildCompositeKey({
+            serverType: sType,
+            serverId: s.serverId,
+            externalUserId: s.serverUserId,
+            deviceId: s.deviceId ?? null,
+            ratingKey: s.ratingKey ?? null,
+            sessionKey: s.sessionKey,
+          });
+        }
+        return `${s.serverId}:${s.sessionKey}`;
+      })
+    );
+
+    const activeRulesV2 = await getActiveRulesV2();
+    const { newSessions, stoppedSessionKeys, updatedSessions } = await processServerSessions(
+      server as ServerWithToken,
+      activeRulesV2,
+      cachedSessionKeys,
+      cachedSessions
+    );
+
+    if (newSessions.length > 0 || stoppedSessionKeys.length > 0 || updatedSessions.length > 0) {
+      await processPollResults({
+        newSessions,
+        stoppedKeys: stoppedSessionKeys,
+        updatedSessions,
+        cachedSessions,
+        cacheService,
+        pubSubService,
+        enqueueNotification,
+      });
+    }
+  } catch (error) {
+    if (!isMaintenance()) {
+      console.error(`[Poller] triggerServerPoll error for ${serverId}:`, error);
+    }
+  }
 }
 
 /**
