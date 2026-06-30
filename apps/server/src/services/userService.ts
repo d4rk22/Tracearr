@@ -11,7 +11,7 @@
  * - Sync operations handle auto-linking by email
  */
 
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import type { MediaUser } from './mediaServer/index.js';
 import type { UserRole } from '@tracearr/shared';
 import { db } from '../db/client.js';
@@ -359,6 +359,32 @@ export async function getServerUserWithDetails(id: string): Promise<ServerUserWi
       type: row.serverType,
     },
   };
+}
+
+/**
+ * Batch-resolve display names for server-user IDs.
+ * Single query: serverUsers LEFT JOIN users WHERE id IN (...).
+ * Returns id → (identityName ?? username). Safe to call with empty array.
+ */
+export async function getServerUserDisplayNames(ids: string[]): Promise<Record<string, string>> {
+  if (ids.length === 0) return {};
+
+  const unique = [...new Set(ids)];
+  const rows = await db
+    .select({
+      id: serverUsers.id,
+      username: serverUsers.username,
+      identityName: users.name,
+    })
+    .from(serverUsers)
+    .leftJoin(users, eq(serverUsers.userId, users.id))
+    .where(inArray(serverUsers.id, unique));
+
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.id] = row.identityName ?? row.username;
+  }
+  return result;
 }
 
 /**

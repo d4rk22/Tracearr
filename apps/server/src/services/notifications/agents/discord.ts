@@ -93,7 +93,11 @@ export class DiscordAgent extends BaseAgent {
   private buildViolationEmbed(_payload: NotificationPayload, ctx: ViolationContext): DiscordEmbed {
     const { violation } = ctx;
     const { label: severityLabel, color } = getSeverityInfo(violation.severity);
-    const detailFields = formatViolationDetailsForDiscord(violation.rule.type, violation.data);
+    const detailFields = formatViolationDetailsForDiscord(
+      violation.rule.type,
+      violation.data,
+      violation.userNames
+    );
 
     return {
       title: 'Violation Detected',

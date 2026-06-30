@@ -7,7 +7,12 @@
 
 import { Queue, Worker, type Job, type ConnectionOptions } from 'bullmq';
 import { getRedisPrefix } from '@tracearr/shared';
-import type { ViolationWithDetails, ActiveSession, NotificationEventType } from '@tracearr/shared';
+import type {
+  ViolationWithDetails,
+  ActiveSession,
+  NotificationEventType,
+  GroupEvidence,
+} from '@tracearr/shared';
 import { isMaintenance } from '../serverState.js';
 import { WS_EVENTS } from '@tracearr/shared';
 import { notificationManager } from '../services/notifications/index.js';
@@ -274,7 +279,31 @@ async function processNotificationJob(job: Job<NotificationJobData>): Promise<vo
   };
 
   switch (type) {
-    case 'violation':
+    case 'violation': {
+      // Resolve display names for user_id array conditions once before dispatch
+      const rawEvidence = Array.isArray(payload.data?.evidence)
+        ? (payload.data.evidence as GroupEvidence[])
+        : [];
+      if (rawEvidence.length > 0) {
+        const userIdSet = new Set<string>();
+        for (const group of rawEvidence) {
+          for (const cond of group.conditions) {
+            if (cond.field === 'user_id') {
+              if (typeof cond.actual === 'string') userIdSet.add(cond.actual);
+              if (Array.isArray(cond.threshold)) {
+                for (const id of cond.threshold) {
+                  if (typeof id === 'string') userIdSet.add(id);
+                }
+              }
+            }
+          }
+        }
+        if (userIdSet.size > 0) {
+          const { getServerUserDisplayNames } = await import('../services/userService.js');
+          payload.userNames = await getServerUserDisplayNames([...userIdSet]);
+        }
+      }
+
       // Send to Discord/webhooks (if routing allows)
       if (routing.discordEnabled || routing.webhookEnabled) {
         await notificationManager.notifyViolation(payload, notificationSettings);
@@ -284,6 +313,7 @@ async function processNotificationJob(job: Job<NotificationJobData>): Promise<vo
         await pushNotificationService.notifyViolation(payload);
       }
       break;
+    }
 
     case 'session_started':
       // Send to Discord/webhooks (if routing allows)

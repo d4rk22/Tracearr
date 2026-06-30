@@ -395,4 +395,28 @@ export function formatEvidenceDetails(
   return details;
 }
 
+/**
+ * Render a list of server-user IDs as display names.
+ * Falls back to "unknown user" for IDs missing from the map.
+ * When max is set and exceeded, shows the first max names then "+N more".
+ */
+export function formatUserList(
+  ids: string[],
+  names: Record<string, string>,
+  opts?: { max?: number }
+): string {
+  if (ids.length === 0) return 'no users';
+
+  const resolved = ids.map((id) => names[id] ?? 'unknown user');
+  const max = opts?.max;
+
+  if (!max || resolved.length <= max) {
+    return resolved.join(', ');
+  }
+
+  const shown = resolved.slice(0, max);
+  const remaining = resolved.length - max;
+  return `${shown.join(', ')} +${remaining} more`;
+}
+
 export { CONDITION_FIELD_LABELS, OPERATOR_LABELS };

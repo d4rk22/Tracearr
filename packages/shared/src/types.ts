@@ -708,6 +708,8 @@ export interface ViolationWithDetails extends Violation {
   actionResults?: ActionResult[];
   /** Condition evidence from V2 rule evaluation */
   evidence?: GroupEvidence[];
+  /** Display names for server-user IDs found in evidence conditions (detail endpoint only) */
+  userNames?: Record<string, string>;
 }
 
 // Stats types

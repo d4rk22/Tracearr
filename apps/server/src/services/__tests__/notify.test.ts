@@ -10,7 +10,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NotificationManager } from '../notifications/index.js';
-import type { ViolationWithDetails, Settings } from '@tracearr/shared';
+import { formatViolationDetailsForDiscord } from '../notifications/formatters/violation.js';
+import type { ViolationWithDetails, Settings, GroupEvidence } from '@tracearr/shared';
 import { createMockActiveSession } from '../../test/fixtures.js';
 
 // Mock global fetch
@@ -642,5 +643,46 @@ describe('testAgent', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('not found');
+  });
+});
+
+describe('formatViolationDetailsForDiscord (user_id friendly names)', () => {
+  const evidence: GroupEvidence[] = [
+    {
+      groupIndex: 0,
+      matched: true,
+      conditions: [
+        {
+          field: 'user_id',
+          operator: 'not_in',
+          threshold: ['id-1', 'id-2'],
+          actual: 'id-other',
+          matched: true,
+        },
+      ],
+    },
+  ];
+
+  it('renders resolved names when userNames map is provided', () => {
+    const userNames = { 'id-1': 'Alice', 'id-2': 'Bob' };
+    const fields = formatViolationDetailsForDiscord(null, { evidence }, userNames);
+    expect(fields).toHaveLength(1);
+    expect(fields[0]!.value).toContain('Alice');
+    expect(fields[0]!.value).toContain('Bob');
+    expect(fields[0]!.value).not.toContain('id-1');
+    expect(fields[0]!.value).not.toContain('id-2');
+  });
+
+  it('falls back to raw threshold string when no userNames map is provided', () => {
+    const fields = formatViolationDetailsForDiscord(null, { evidence });
+    expect(fields).toHaveLength(1);
+    expect(fields[0]!.value).toContain('id-1,id-2');
+  });
+
+  it('resolves the actual user_id value to a name when present in the map', () => {
+    const userNames = { 'id-1': 'Alice', 'id-2': 'Bob', 'id-other': 'Carol' };
+    const fields = formatViolationDetailsForDiscord(null, { evidence }, userNames);
+    expect(fields[0]!.value).toContain('Carol');
+    expect(fields[0]!.value).not.toContain('id-other');
   });
 });

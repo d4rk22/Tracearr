@@ -6,6 +6,7 @@ import {
   SEVERITY_LEVELS,
   CONDITION_FIELD_LABELS,
   OPERATOR_LABELS,
+  formatUserList,
   type GroupEvidence,
 } from '@tracearr/shared';
 import type { ViolationWithDetails } from '../types.js';
@@ -84,12 +85,12 @@ export interface DiscordField {
 }
 
 /**
- * Format violation details into Discord embed fields based on rule type
- */
-/**
  * Format evidence from V2 rule evaluation into Discord embed fields.
  */
-function formatEvidenceForDiscord(evidence: GroupEvidence[]): DiscordField[] {
+function formatEvidenceForDiscord(
+  evidence: GroupEvidence[],
+  userNames?: Record<string, string>
+): DiscordField[] {
   const fields: DiscordField[] = [];
 
   for (const group of evidence) {
@@ -97,9 +98,17 @@ function formatEvidenceForDiscord(evidence: GroupEvidence[]): DiscordField[] {
     for (const cond of matchedConditions) {
       const label = CONDITION_FIELD_LABELS[cond.field] ?? cond.field;
       const op = OPERATOR_LABELS[cond.operator] ?? cond.operator;
-      const actual =
-        cond.actual !== null && cond.actual !== undefined ? String(cond.actual) : 'N/A';
-      const threshold = String(cond.threshold);
+      let actual = cond.actual !== null && cond.actual !== undefined ? String(cond.actual) : 'N/A';
+      if (cond.field === 'user_id' && userNames && typeof cond.actual === 'string') {
+        actual = userNames[cond.actual] ?? actual;
+      }
+
+      let threshold: string;
+      if (cond.field === 'user_id' && Array.isArray(cond.threshold) && userNames !== undefined) {
+        threshold = formatUserList(cond.threshold as string[], userNames, { max: 15 });
+      } else {
+        threshold = String(cond.threshold);
+      }
 
       fields.push({
         name: label,
@@ -117,13 +126,14 @@ function formatEvidenceForDiscord(evidence: GroupEvidence[]): DiscordField[] {
  */
 export function formatViolationDetailsForDiscord(
   ruleType: string | null,
-  data: Record<string, unknown> | null
+  data: Record<string, unknown> | null,
+  userNames?: Record<string, string>
 ): DiscordField[] {
   if (!data) return [];
 
   // V2 violations: format from evidence
   if (!ruleType && Array.isArray(data.evidence)) {
-    return formatEvidenceForDiscord(data.evidence as GroupEvidence[]);
+    return formatEvidenceForDiscord(data.evidence as GroupEvidence[], userNames);
   }
 
   if (!ruleType) return [];

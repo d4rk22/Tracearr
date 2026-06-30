@@ -26,6 +26,7 @@ import {
   resolveServerIds,
   buildMultiServerCondition,
 } from '../utils/serverFiltering.js';
+import { getServerUserDisplayNames } from '../services/userService.js';
 
 /**
  * Build ORDER BY SQL clause for violations based on sort field and direction.
@@ -839,7 +840,33 @@ export const violationRoutes: FastifyPluginAsync = async (app) => {
 
     // Enrich with related sessions, user history, and action results
     const enriched = await enrichViolations([violation as ViolationRow]);
-    return enriched[0];
+    const enrichedViolation = enriched[0];
+    if (!enrichedViolation) {
+      return reply.notFound('Violation not found');
+    }
+
+    // Resolve display names for user_id array conditions (in/not_in) in evidence
+    if (enrichedViolation.evidence && enrichedViolation.evidence.length > 0) {
+      const userIdSet = new Set<string>();
+      for (const group of enrichedViolation.evidence) {
+        for (const cond of group.conditions) {
+          if (cond.field === 'user_id') {
+            if (Array.isArray(cond.threshold)) {
+              for (const id of cond.threshold) {
+                if (typeof id === 'string') userIdSet.add(id);
+              }
+            }
+            if (typeof cond.actual === 'string') userIdSet.add(cond.actual);
+          }
+        }
+      }
+      if (userIdSet.size > 0) {
+        const userNames = await getServerUserDisplayNames([...userIdSet]);
+        return { ...enrichedViolation, userNames };
+      }
+    }
+
+    return enrichedViolation;
   });
 
   /**

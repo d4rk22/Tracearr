@@ -481,6 +481,7 @@ export {
   getViolationDetails,
   formatEvidenceDescription,
   formatEvidenceDetails,
+  formatUserList,
   CONDITION_FIELD_LABELS,
   OPERATOR_LABELS,
 } from './violations.js';

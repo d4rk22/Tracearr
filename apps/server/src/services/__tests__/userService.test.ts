@@ -35,6 +35,7 @@ import {
   updateServerUserTrustScore,
   getServerUsersByServer,
   batchSyncUsersFromMediaServer,
+  getServerUserDisplayNames,
   UserNotFoundError,
   ServerUserNotFoundError,
 } from '../userService.js';
@@ -681,5 +682,52 @@ describe('UserNotFoundError', () => {
   it('should have error code from NotFoundError', () => {
     const error = new UserNotFoundError('test');
     expect(error.code).toBe('RES_001');
+  });
+});
+
+describe('getServerUserDisplayNames', () => {
+  function mockSelectWithLeftJoin(result: unknown[]) {
+    const chain = {
+      from: vi.fn().mockReturnThis(),
+      leftJoin: vi.fn().mockReturnThis(),
+      where: vi.fn().mockResolvedValue(result),
+    };
+    vi.mocked(db.select).mockReturnValue(chain as never);
+    return chain;
+  }
+
+  it('returns empty map without querying for empty input', async () => {
+    const result = await getServerUserDisplayNames([]);
+    expect(result).toEqual({});
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('returns id→name map using identityName when present', async () => {
+    const rows = [
+      { id: 'id-1', username: 'alice', identityName: 'Alice Smith' },
+      { id: 'id-2', username: 'bob', identityName: null },
+    ];
+    mockSelectWithLeftJoin(rows);
+
+    const result = await getServerUserDisplayNames(['id-1', 'id-2']);
+
+    expect(result).toEqual({ 'id-1': 'Alice Smith', 'id-2': 'bob' });
+  });
+
+  it('issues a single query for multiple ids', async () => {
+    mockSelectWithLeftJoin([{ id: 'id-1', username: 'u', identityName: null }]);
+
+    await getServerUserDisplayNames(['id-1', 'id-2', 'id-3']);
+
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates ids before querying', async () => {
+    const chain = mockSelectWithLeftJoin([{ id: 'id-1', username: 'u', identityName: null }]);
+
+    await getServerUserDisplayNames(['id-1', 'id-1', 'id-1']);
+
+    expect(db.select).toHaveBeenCalledTimes(1);
+    expect(chain.where).toHaveBeenCalledTimes(1);
   });
 });

@@ -17,6 +17,7 @@ import {
   CONDITION_FIELD_LABELS,
   OPERATOR_LABELS,
   formatConditionFieldValue,
+  formatUserList,
   type UnitSystem,
 } from '@tracearr/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,11 +91,13 @@ function ConditionEvidenceRow({
   const thresholdFormatted = formatConditionFieldValue(thresholdNum, condition.field, unitSystem);
   const unitSuffix = thresholdFormatted.unit ? ` ${thresholdFormatted.unit}` : '';
   const thresholdDisplay =
-    condition.field === 'user_id'
-      ? resolveValue(condition.threshold)
-      : thresholdFormatted.unit
-        ? String(thresholdFormatted.displayValue)
-        : String(condition.threshold);
+    condition.field === 'user_id' && Array.isArray(condition.threshold)
+      ? formatUserList(condition.threshold as string[], userIdToName ?? {})
+      : condition.field === 'user_id'
+        ? resolveValue(condition.threshold)
+        : thresholdFormatted.unit
+          ? String(thresholdFormatted.displayValue)
+          : String(condition.threshold);
 
   let actualDisplay: string;
   if (condition.actual !== null && condition.actual !== undefined) {
@@ -377,6 +380,11 @@ export function ViolationDetail() {
 
   const userDisplayName = violation.user.identityName ?? violation.user.username;
 
+  const userIdToName: Record<string, string> = {
+    ...(violation.userNames ?? {}),
+    [violation.user.id]: userDisplayName,
+  };
+
   const rawDescription = getViolationDescription(violation, unitSystem);
   const description = rawDescription.split(violation.user.id).join(userDisplayName);
 
@@ -550,7 +558,7 @@ export function ViolationDetail() {
                 key={group.groupIndex}
                 group={group}
                 unitSystem={unitSystem}
-                userIdToName={{ [violation.user.id]: userDisplayName }}
+                userIdToName={userIdToName}
               />
             ))}
           </div>
