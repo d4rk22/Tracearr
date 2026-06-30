@@ -273,11 +273,32 @@ describe('Helper Functions', () => {
       expect(normalizeDeviceType('Chrome Browser', null)).toBe('browser');
       expect(normalizeDeviceType('Firefox', null)).toBe('browser');
       expect(normalizeDeviceType('Safari', null)).toBe('browser');
+      expect(normalizeDeviceType('Microsoft Edge', null)).toBe('browser');
     });
 
     it('returns unknown for unrecognized devices', () => {
       expect(normalizeDeviceType(null, null)).toBe('unknown');
       expect(normalizeDeviceType('Unknown Device', 'Unknown Platform')).toBe('unknown');
+    });
+
+    // regression: issue #826, Plex Web sessions on macOS were misclassified as unknown
+    it('classifies Plex Web (OSX/Chrome) as browser, not unknown', () => {
+      expect(normalizeDeviceType('OSX', 'Chrome')).toBe('browser');
+      expect(normalizeDeviceType('OSX', 'Chrome', 'Plex Web')).toBe('browser');
+      expect(normalizeDeviceType('Chrome', 'OSX')).toBe('browser');
+    });
+
+    it('classifies native desktop app (no browser signal) as desktop', () => {
+      expect(normalizeDeviceType('OSX', 'OSX', 'Plex for Mac')).toBe('desktop');
+    });
+
+    it('uses product to detect web player even when device/platform give no browser signal', () => {
+      expect(normalizeDeviceType('Windows', null, 'Plex Web')).toBe('browser');
+    });
+
+    it('keeps tv devices as tv even though chromecast/webos contain browser substrings', () => {
+      expect(normalizeDeviceType(null, 'chromecast')).toBe('tv');
+      expect(normalizeDeviceType(null, 'webos')).toBe('tv');
     });
   });
 
@@ -565,6 +586,63 @@ describe('Session Behavior Evaluators', () => {
       expect(result.matched).toBe(true);
       expect(result.actual).toBe(2);
       expect(result.relatedSessionIds).toEqual(['s1', 's2']);
+    });
+
+    // regression: issue #826 — Plex Web sessions were classified as 'unknown' instead of 'browser'
+    // causing false triggers when count_device_types included 'unknown'
+    it('does not count Plex Web (OSX/Chrome) sessions when filter is tv+unknown', async () => {
+      const webSession1 = createMockSession({
+        id: 's1',
+        serverUserId: 'user-1',
+        deviceId: 'device-1',
+        ipAddress: '1.2.3.4',
+        device: 'OSX',
+        platform: 'Chrome',
+        product: 'Plex Web',
+      });
+      const webSession2 = createMockSession({
+        id: 's2',
+        serverUserId: 'user-1',
+        deviceId: 'device-2',
+        ipAddress: '5.6.7.8',
+        device: 'OSX',
+        platform: 'Chrome',
+        product: 'Plex Web',
+      });
+
+      const ctx = createTestContext({
+        session: webSession1,
+        serverUser: createMockServerUser({ id: 'user-1' }),
+        activeSessions: [webSession1, webSession2],
+      });
+
+      const evaluator = evaluatorRegistry.concurrent_streams;
+
+      // tv+unknown filter: Plex Web sessions must NOT count (they're browser, not unknown)
+      const tvUnknownResult = await evaluator(
+        ctx,
+        createCondition({
+          field: 'concurrent_streams',
+          operator: 'gte',
+          value: 2,
+          params: { exclude_same_ip: true, count_device_types: ['tv', 'unknown'] },
+        })
+      );
+      expect(tvUnknownResult.matched).toBe(false);
+      expect(tvUnknownResult.actual).toBe(0);
+
+      // browser filter: both Plex Web sessions must count
+      const browserResult = await evaluator(
+        ctx,
+        createCondition({
+          field: 'concurrent_streams',
+          operator: 'gte',
+          value: 2,
+          params: { exclude_same_ip: true, count_device_types: ['browser'] },
+        })
+      );
+      expect(browserResult.matched).toBe(true);
+      expect(browserResult.actual).toBe(2);
     });
   });
 

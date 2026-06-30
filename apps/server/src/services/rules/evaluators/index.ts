@@ -69,63 +69,65 @@ function resolutionToNumber(resolution: VideoResolution): number {
 }
 
 /**
- * Normalize device type from session device/platform info.
+ * Normalize device type from session device/platform/product info.
  */
-function normalizeDeviceType(device: string | null, platform: string | null): DeviceType {
-  const deviceLower = (device ?? '').toLowerCase();
-  const platformLower = (platform ?? '').toLowerCase();
+function normalizeDeviceType(
+  device: string | null,
+  platform: string | null,
+  product?: string | null
+): DeviceType {
+  const haystack = `${device ?? ''} ${platform ?? ''} ${product ?? ''}`.toLowerCase();
 
-  // TV detection
+  // tv before browser: 'chromecast' contains 'chrome', 'webos' contains 'web'
   if (
-    deviceLower.includes('tv') ||
-    platformLower.includes('tv') ||
-    platformLower.includes('roku') ||
-    platformLower.includes('webos') ||
-    platformLower.includes('tizen') ||
-    platformLower.includes('firetv') ||
-    platformLower.includes('chromecast') ||
-    platformLower.includes('androidtv')
+    haystack.includes('tv') ||
+    haystack.includes('roku') ||
+    haystack.includes('webos') ||
+    haystack.includes('tizen') ||
+    haystack.includes('firetv') ||
+    haystack.includes('chromecast') ||
+    haystack.includes('androidtv')
   ) {
     return 'tv';
   }
 
-  // Mobile detection
-  if (
-    deviceLower.includes('iphone') ||
-    deviceLower.includes('phone') ||
-    platformLower === 'ios' ||
-    platformLower === 'android'
-  ) {
-    // Check if it's a tablet
-    if (deviceLower.includes('ipad') || deviceLower.includes('tablet')) {
-      return 'tablet';
-    }
-    return 'mobile';
-  }
-
-  // Tablet detection
-  if (deviceLower.includes('ipad') || deviceLower.includes('tablet')) {
+  // tablet before mobile: ipad reports platform 'iOS'
+  if (haystack.includes('ipad') || haystack.includes('tablet')) {
     return 'tablet';
   }
 
-  // Desktop detection
   if (
-    platformLower.includes('windows') ||
-    platformLower.includes('macos') ||
-    platformLower.includes('linux')
+    haystack.includes('iphone') ||
+    haystack.includes('phone') ||
+    haystack.includes('ios') ||
+    haystack.includes('android')
   ) {
-    return 'desktop';
+    return 'mobile';
   }
 
-  // Browser detection (web players)
+  // browser before desktop so plex web on a desktop OS stays browser
   if (
-    deviceLower.includes('browser') ||
-    deviceLower.includes('chrome') ||
-    deviceLower.includes('firefox') ||
-    deviceLower.includes('safari') ||
-    deviceLower.includes('edge')
+    haystack.includes('chrome') ||
+    haystack.includes('firefox') ||
+    haystack.includes('safari') ||
+    haystack.includes('edge') ||
+    haystack.includes('browser') ||
+    haystack.includes('web')
   ) {
     return 'browser';
+  }
+
+  if (
+    haystack.includes('windows') ||
+    haystack.includes('macos') ||
+    haystack.includes('mac os') ||
+    haystack.includes('osx') ||
+    haystack.includes('os x') ||
+    haystack.includes('darwin') ||
+    haystack.includes('linux') ||
+    haystack.includes('mac')
+  ) {
+    return 'desktop';
   }
 
   return 'unknown';
@@ -175,7 +177,7 @@ const evaluateConcurrentStreams: ConditionEvaluator = (
   // Unlike the exclusions below, the triggering session is NOT exempt.
   if (countDeviceTypes?.length) {
     userActiveSessions = userActiveSessions.filter((s) =>
-      countDeviceTypes.includes(normalizeDeviceType(s.device, s.platform))
+      countDeviceTypes.includes(normalizeDeviceType(s.device, s.platform, s.product))
     );
   }
 
@@ -699,7 +701,7 @@ const evaluateDeviceType: ConditionEvaluator = (
 ): EvaluatorResult => {
   const { session } = context;
 
-  const deviceType = normalizeDeviceType(session.device, session.platform);
+  const deviceType = normalizeDeviceType(session.device, session.platform, session.product);
 
   return {
     matched: compare(deviceType, condition.operator, condition.value),
