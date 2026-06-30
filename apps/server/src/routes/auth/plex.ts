@@ -32,6 +32,7 @@ import { generateTokens, generateTempToken, PLEX_TEMP_TOKEN_TTL } from './utils.
 import { syncServer } from '../../services/sync.js';
 import { getUserByPlexAccountId, getOwnerUser, getUserById } from '../../services/userService.js';
 import { isClaimCodeEnabled, validateClaimCode } from '../../utils/claimCode.js';
+import { assertSafeProbeUrl } from '../../utils/ssrf.js';
 
 // Schemas
 const plexCheckPinSchema = z.object({
@@ -66,6 +67,7 @@ const plexTestConnectionSchema = z.object({
   uri: z.url(),
   accountId: z.uuid().optional(),
   tempToken: z.string().optional(), // Set during signup before the user has a Tracearr account
+  claimCode: z.string().optional(),
 });
 
 // Connection testing timeout in milliseconds
@@ -119,6 +121,7 @@ async function testSingleConnection(
 ): Promise<PlexDiscoveredConnection> {
   const start = Date.now();
   try {
+    assertSafeProbeUrl(conn.uri);
     const response = await fetch(`${conn.uri}/`, {
       headers: plexHeaders(token),
       signal: AbortSignal.timeout(CONNECTION_TEST_TIMEOUT),
@@ -492,6 +495,24 @@ export const plexRoutes: FastifyPluginAsync = async (app) => {
     };
 
     try {
+      // Re-check if owner exists at connection time (before any outbound probe or DB write).
+      // Do NOT trust the isFirstUser flag from temp token - it may be stale.
+      const currentOwner = await getOwnerUser();
+      const actuallyFirstUser = !currentOwner;
+
+      if (!actuallyFirstUser) {
+        return reply.forbidden(
+          'This Tracearr instance already has an owner. Only the owner can log in.'
+        );
+      }
+
+      // Claim code guard before the outbound admin probe
+      if (isClaimCodeEnabled()) {
+        if (!claimCode || !validateClaimCode(claimCode)) {
+          return reply.forbidden('Claim code required for first-time setup');
+        }
+      }
+
       // Verify user is admin on the selected server
       const adminCheck = await PlexClient.verifyServerAdmin(plexToken, serverUri);
       if (!adminCheck.success) {
@@ -543,24 +564,6 @@ export const plexRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const serverId = server[0]!.id;
-
-      // Re-check if owner exists at connection time
-      // Do NOT trust the isFirstUser flag from temp token - it may be stale
-      const currentOwner = await getOwnerUser();
-      const actuallyFirstUser = !currentOwner;
-
-      if (!actuallyFirstUser) {
-        return reply.forbidden(
-          'This Tracearr instance already has an owner. Only the owner can log in.'
-        );
-      }
-
-      // Validate claim code for first user if enabled
-      if (isClaimCodeEnabled()) {
-        if (!claimCode || !validateClaimCode(claimCode)) {
-          return reply.forbidden('Claim code required for first-time setup');
-        }
-      }
 
       const role = 'owner';
 
@@ -884,7 +887,7 @@ export const plexRoutes: FastifyPluginAsync = async (app) => {
         return reply.badRequest('uri is required');
       }
 
-      const { uri, accountId, tempToken } = body.data;
+      const { uri, accountId, tempToken, claimCode } = body.data;
 
       // Resolve the plex token. Two branches:
       // 1. tempToken (signup): look up the stored Plex token from Redis
@@ -898,6 +901,11 @@ export const plexRoutes: FastifyPluginAsync = async (app) => {
         }
         const parsed = JSON.parse(stored) as { plexToken: string };
         plexToken = parsed.plexToken;
+
+        // Claim code guard must run before the outbound probe
+        if (isClaimCodeEnabled() && !validateClaimCode(claimCode)) {
+          return reply.forbidden('Claim code required for first-time setup');
+        }
       } else {
         // Run the standard authenticate decorator (covers JWT verify +
         // isTokenRevoked). It sends the reply on failure, so short-circuit.

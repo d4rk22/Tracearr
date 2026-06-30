@@ -131,15 +131,6 @@ function mockDbInsert(result: unknown[]) {
   return chain;
 }
 
-function _mockDbUpdate() {
-  const chain = {
-    set: vi.fn().mockReturnThis(),
-    where: vi.fn().mockResolvedValue(undefined),
-  };
-  vi.mocked(db.update).mockReturnValue(chain as never);
-  return chain;
-}
-
 async function buildTestApp(authUser: AuthUser): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   await app.register(sensible);
@@ -804,14 +795,16 @@ describe('Plex Auth Routes', () => {
     describe('when claim code is enabled', () => {
       beforeEach(() => {
         vi.mocked(isClaimCodeEnabled).mockReturnValue(true);
-        // Mock admin verification to succeed (happens before claim code check)
+        // verifyServerAdmin is called after the claim code check
         vi.mocked(PlexClient.verifyServerAdmin).mockResolvedValue({
           success: true,
         });
       });
 
-      // The route does a db.select for the existing server BEFORE the claim
-      // code check, so even tests that only assert the 403 need this stub.
+      // getOwnerUser() is mocked (vi.fn(), no db.select) so it runs before the
+      // claim-code check with no DB side effects. This stub is only required
+      // by the "allows" test which proceeds past both guards to verifyServerAdmin
+      // and then into the server create/update path.
       const stubExistingServerLookupEmpty = () => {
         vi.mocked(db.select).mockReturnValue({
           from: vi.fn().mockReturnThis(),
@@ -1494,6 +1487,113 @@ describe('Plex Auth Routes', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json().connection.reachable).toBe(true);
+    });
+  });
+
+  describe('POST /plex/test-connection - Claim Code Guard', () => {
+    afterEach(() => {
+      mockRedis.get.mockReset();
+      mockFetch.mockReset();
+    });
+
+    it('returns 403 in tempToken branch when claim code is enabled and missing', async () => {
+      app = await buildUnauthenticatedTestApp();
+      vi.mocked(isClaimCodeEnabled).mockReturnValue(true);
+      mockRedis.get.mockResolvedValue(JSON.stringify({ plexToken: 'plex-tok' }));
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/plex/test-connection',
+        payload: { uri: 'http://192.168.1.100:32400', tempToken: 'temp-abc' },
+        // no claimCode
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json().message).toContain('Claim code required');
+      // The outbound probe must not have fired
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 in tempToken branch when claim code is enabled and invalid', async () => {
+      app = await buildUnauthenticatedTestApp();
+      vi.mocked(isClaimCodeEnabled).mockReturnValue(true);
+      vi.mocked(validateClaimCode).mockReturnValue(false);
+      mockRedis.get.mockResolvedValue(JSON.stringify({ plexToken: 'plex-tok' }));
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/plex/test-connection',
+        payload: { uri: 'http://192.168.1.100:32400', tempToken: 'temp-abc', claimCode: 'WRONG' },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('allows tempToken branch when claim code is enabled and valid', async () => {
+      app = await buildUnauthenticatedTestApp();
+      vi.mocked(isClaimCodeEnabled).mockReturnValue(true);
+      vi.mocked(validateClaimCode).mockReturnValue(true);
+      mockRedis.get.mockResolvedValue(JSON.stringify({ plexToken: 'plex-tok' }));
+      mockFetch.mockResolvedValueOnce({ ok: true });
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/plex/test-connection',
+        payload: {
+          uri: 'http://192.168.1.100:32400',
+          tempToken: 'temp-abc',
+          claimCode: 'VALID-CODE',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().connection.reachable).toBe(true);
+      expect(validateClaimCode).toHaveBeenCalledWith('VALID-CODE');
+    });
+  });
+
+  describe('POST /plex/connect - Guard ordering', () => {
+    let app: FastifyInstance;
+
+    afterEach(async () => {
+      if (app) await app.close();
+      vi.resetAllMocks();
+      mockRedis.get.mockReset();
+      mockRedis.del.mockReset();
+    });
+
+    const tempToken = 'temp-guard-test';
+    const storedData = {
+      plexAccountId: 'plex-account-x',
+      plexUsername: 'user',
+      plexEmail: 'u@e.com',
+      plexThumb: 'https://e.com/u.jpg',
+      plexToken: 'plex-token-x',
+    };
+
+    it('does not call verifyServerAdmin or create a server row when claim code is missing', async () => {
+      app = await buildUnauthenticatedTestApp();
+      vi.mocked(isClaimCodeEnabled).mockReturnValue(true);
+      mockRedis.get.mockResolvedValue(JSON.stringify(storedData));
+      // getOwnerUser returns undefined (no existing owner) so first-user check passes
+      vi.mocked(getOwnerUser).mockResolvedValue(null);
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/plex/connect',
+        payload: {
+          tempToken,
+          serverUri: 'http://192.168.1.100:32400',
+          serverName: 'My Server',
+          // no claimCode
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json().message).toContain('Claim code required');
+      expect(PlexClient.verifyServerAdmin).not.toHaveBeenCalled();
+      expect(db.insert).not.toHaveBeenCalled();
     });
   });
 
