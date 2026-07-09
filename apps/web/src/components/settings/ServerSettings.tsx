@@ -38,6 +38,7 @@ import {
   Zap,
   Radio,
   Copy,
+  ArrowUpCircle,
 } from 'lucide-react';
 import { MediaServerIcon } from '@/components/icons/MediaServerIcon';
 import { format } from 'date-fns';
@@ -936,10 +937,12 @@ function RealtimeSetupDialog({
   server,
   open,
   onClose,
+  mode = 'setup',
 }: {
   server: Server;
   open: boolean;
   onClose: () => void;
+  mode?: 'setup' | 'update';
 }) {
   const { t } = useTranslation(['settings']);
   const [copied, setCopied] = useState(false);
@@ -956,11 +959,19 @@ function RealtimeSetupDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{t('servers.realtimeDialog.title')}</DialogTitle>
+          <DialogTitle>
+            {mode === 'update'
+              ? t('servers.realtimeDialog.updateTitle')
+              : t('servers.realtimeDialog.title')}
+          </DialogTitle>
           <DialogDescription>
             {server.type === 'jellyfin'
-              ? t('servers.realtimeDialog.jellyfinDescription')
-              : t('servers.realtimeDialog.embyDescription')}
+              ? mode === 'update'
+                ? t('servers.realtimeDialog.jellyfinUpdateDescription')
+                : t('servers.realtimeDialog.jellyfinDescription')
+              : mode === 'update'
+                ? t('servers.realtimeDialog.embyUpdateDescription')
+                : t('servers.realtimeDialog.embyDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -1053,6 +1064,7 @@ function SortableServerCard({
 }) {
   const { t } = useTranslation(['settings', 'common', 'pages']);
   const [showRealtimeDialog, setShowRealtimeDialog] = useState(false);
+  const [realtimeDialogMode, setRealtimeDialogMode] = useState<'setup' | 'update'>('setup');
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: server.id,
     disabled: !isDraggable,
@@ -1131,7 +1143,10 @@ function SortableServerCard({
                     <button
                       type="button"
                       className="text-primary ml-1 hover:underline"
-                      onClick={() => setShowRealtimeDialog(true)}
+                      onClick={() => {
+                        setRealtimeDialogMode('setup');
+                        setShowRealtimeDialog(true);
+                      }}
                     >
                       {t('servers.setupRealtime')}
                     </button>
@@ -1143,9 +1158,17 @@ function SortableServerCard({
                   </span>
                 )}
                 {connectionStatus?.pluginUpdateAvailable && (
-                  <span className="ml-2 text-xs text-amber-500">
+                  <button
+                    type="button"
+                    className="ml-2 inline-flex items-center gap-1 text-xs text-amber-500 hover:underline"
+                    onClick={() => {
+                      setRealtimeDialogMode('update');
+                      setShowRealtimeDialog(true);
+                    }}
+                  >
+                    <ArrowUpCircle className="h-3 w-3" aria-hidden="true" />
                     {t('servers.pluginUpdateAvailable')}
-                  </span>
+                  </button>
                 )}
               </div>
             )}
@@ -1166,6 +1189,7 @@ function SortableServerCard({
           server={server}
           open={showRealtimeDialog}
           onClose={() => setShowRealtimeDialog(false)}
+          mode={realtimeDialogMode}
         />
       )}
     </div>

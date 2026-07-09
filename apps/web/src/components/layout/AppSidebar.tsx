@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router';
+import { NavLink, useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, ArrowUpCircle, BookOpen, Globe, Heart } from 'lucide-react';
 import {
@@ -26,6 +26,7 @@ import { navigation, isNavGroup, type NavItem, type NavGroup } from './nav-data'
 import { UpdateDialog } from './UpdateDialog';
 import { cn } from '@/lib/utils';
 import { useVersion } from '@/hooks/queries';
+import { useSocket } from '@/hooks/useSocket';
 
 function NavMenuItem({ item }: { item: NavItem }) {
   const { setOpenMobile } = useSidebar();
@@ -96,6 +97,12 @@ function VersionDisplay() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { t } = useTranslation(['common', 'settings']);
   const { data: version, isLoading } = useVersion();
+  const { serverConnectionStatuses } = useSocket();
+  const navigate = useNavigate();
+
+  const pluginUpdateAvailable = [...serverConnectionStatuses.values()].some(
+    (s) => s.pluginUpdateAvailable
+  );
 
   if (isLoading || !version) {
     return <div className="text-muted-foreground text-xs">{t('common:states.loading')}</div>;
@@ -131,6 +138,17 @@ function VersionDisplay() {
           >
             <ArrowUpCircle className="h-3 w-3" />
             <span className="text-[10px]">{getUpdateLabel()}</span>
+          </Badge>
+        )}
+        {pluginUpdateAvailable && (
+          <Badge
+            variant="secondary"
+            className="h-5 cursor-pointer bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400"
+            onClick={() => navigate('/settings/servers')}
+            title={t('settings:servers.pluginUpdateAvailable')}
+            aria-label={t('settings:servers.pluginUpdateAvailable')}
+          >
+            <ArrowUpCircle className="h-3 w-3" />
           </Badge>
         )}
       </div>
