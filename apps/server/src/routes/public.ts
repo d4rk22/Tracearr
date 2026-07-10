@@ -137,6 +137,7 @@ const serverFilterSchema = z.object({
 // Streams query schema (extends server filter with summary option)
 const streamsQuerySchema = serverFilterSchema.extend({
   summary: booleanStringSchema.optional(),
+  includeLocation: booleanStringSchema.optional(),
 });
 
 // Response envelope helper
@@ -322,6 +323,7 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
     const query = streamsQuerySchema.safeParse(request.query);
     const serverId = query.success ? query.data.serverId : undefined;
     const summaryOnly = query.success ? query.data.summary : false;
+    const includeLocation = query.success ? query.data.includeLocation : false;
 
     const cacheService = getCacheService();
     let activeSessions = cacheService ? await cacheService.getAllActiveSessions() : [];
@@ -377,6 +379,15 @@ export const publicRoutes: FastifyPluginAsync = async (app) => {
           player: session.playerName,
           product: session.product,
           platform: session.platform,
+          ...(includeLocation
+            ? {
+                geoCity: session.geoCity,
+                geoRegion: session.geoRegion,
+                geoCountry: session.geoCountry,
+                geoLat: session.geoLat,
+                geoLon: session.geoLon,
+              }
+            : {}),
         }));
 
     const categorizeStream = (session: (typeof activeSessions)[0]) => {

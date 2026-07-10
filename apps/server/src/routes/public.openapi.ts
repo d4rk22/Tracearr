@@ -466,6 +466,18 @@ const StreamsQuery = z.object({
     description: 'Return only summary (omit data array)',
     example: false,
   }),
+  includeLocation: z.coerce.boolean().optional().openapi({
+    description: 'Include stream geo location fields; raw IP addresses are never returned',
+    example: false,
+  }),
+});
+
+const StreamLocation = z.object({
+  geoCity: z.string().nullable().openapi({ example: 'Lincoln' }),
+  geoRegion: z.string().nullable().openapi({ example: 'NE' }),
+  geoCountry: z.string().nullable().openapi({ example: 'US' }),
+  geoLat: z.number().nullable().openapi({ example: 40.8136 }),
+  geoLon: z.number().nullable().openapi({ example: -96.7026 }),
 });
 
 const Stream = z
@@ -492,6 +504,8 @@ const Stream = z
     ...DisplayValues.shape,
     // Device
     ...DeviceInfo.shape,
+    // Optional when includeLocation=true
+    ...StreamLocation.partial().shape,
   })
   .openapi('Stream');
 
