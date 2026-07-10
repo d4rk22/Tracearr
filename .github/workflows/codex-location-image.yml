@@ -1,0 +1,96 @@
+name: Publish include-location POC image
+
+on:
+  push:
+    branches:
+      - codex/include-location
+    paths:
+      - .github/workflows/codex-location-image.yml
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/d4rk22/tracearr
+  SOURCE_SHA: 7f6a335d9c1c703f3e2941adbf6915dcecc37814
+  IMAGE_TAG: codex-include-location-7f6a335d
+  HUSKY: 0
+
+jobs:
+  test-build-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact POC commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build route test dependencies
+        run: pnpm turbo run build --filter=@tracearr/shared --filter=@tracearr/test-utils
+
+      - name: Verify public stream location contract
+        run: pnpm --filter @tracearr/server exec vitest run src/routes/__tests__/public.test.ts
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish immutable POC input
+        id: build
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=tracearr-codex-location-amd64
+          cache-to: type=gha,mode=max,scope=tracearr-codex-location-amd64
+          build-args: |
+            APP_VERSION=0.0.0-codex-location
+            APP_TAG=${{ env.IMAGE_TAG }}
+            APP_COMMIT=${{ env.SOURCE_SHA }}
+            APP_BUILD_DATE=2026-07-10T19:21:53Z
+            CACHE_BUST=${{ env.SOURCE_SHA }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/d4rk22/Tracearr
+            org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
+            org.opencontainers.image.version=0.0.0-codex-location
+
+      - name: Record immutable digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          test -n "$DIGEST"
+          printf '### Published image\n\n\x60%s@%s\x60\n' "$IMAGE" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+          printf '{"image":"%s","tag":"%s","digest":"%s","sourceSha":"%s"}\n' \
+            "$IMAGE" "$IMAGE_TAG" "$DIGEST" "$SOURCE_SHA" > image-digest.json
+
+      - name: Upload digest evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: tracearr-include-location-digest
+          path: image-digest.json
+          retention-days: 30
+          if-no-files-found: error
