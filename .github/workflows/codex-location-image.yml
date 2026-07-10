@@ -14,7 +14,7 @@ permissions:
 env:
   IMAGE: ghcr.io/d4rk22/tracearr
   SOURCE_SHA: 7f6a335d9c1c703f3e2941adbf6915dcecc37814
-  IMAGE_TAG: codex-include-location-7f6a335d
+  IMAGE_TAG: codex-include-location-v1.4.30-7f6a335d
   HUSKY: 0
 
 jobs:
@@ -68,15 +68,15 @@ jobs:
           cache-from: type=gha,scope=tracearr-codex-location-amd64
           cache-to: type=gha,mode=max,scope=tracearr-codex-location-amd64
           build-args: |
-            APP_VERSION=0.0.0-codex-location
+            APP_VERSION=v1.4.30
             APP_TAG=${{ env.IMAGE_TAG }}
             APP_COMMIT=${{ env.SOURCE_SHA }}
             APP_BUILD_DATE=2026-07-10T19:21:53Z
-            CACHE_BUST=${{ env.SOURCE_SHA }}
+            CACHE_BUST=${{ env.SOURCE_SHA }}-v1.4.30
           labels: |
             org.opencontainers.image.source=https://github.com/d4rk22/Tracearr
             org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
-            org.opencontainers.image.version=0.0.0-codex-location
+            org.opencontainers.image.version=v1.4.30
 
       - name: Record immutable digest
         env:
@@ -90,7 +90,7 @@ jobs:
       - name: Upload digest evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: tracearr-include-location-digest
+          name: tracearr-include-location-v1.4.30-digest
           path: image-digest.json
           retention-days: 30
           if-no-files-found: error
