@@ -23,6 +23,7 @@ import {
   uniqueIndex,
   unique,
   check,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { MEDIA_TYPES } from '@tracearr/shared';
@@ -242,6 +243,35 @@ export const serverUsers = pgTable(
     index('server_users_last_activity_idx').on(table.lastActivityAt),
     // For filtering out removed users
     index('server_users_removed_at_idx').on(table.removedAt),
+  ]
+);
+
+/**
+ * Admin-defined location for a stable device belonging to a server user.
+ * New sessions from this user/device use this location instead of GeoIP.
+ */
+export const deviceLocationOverrides = pgTable(
+  'device_location_overrides',
+  {
+    serverUserId: uuid('server_user_id')
+      .notNull()
+      .references(() => serverUsers.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 255 }).notNull(),
+    city: varchar('city', { length: 255 }).notNull(),
+    region: varchar('region', { length: 255 }),
+    country: varchar('country', { length: 100 }).notNull(),
+    latitude: real('latitude').notNull(),
+    longitude: real('longitude').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.serverUserId, table.deviceId] }),
+    check('device_location_overrides_latitude_check', sql`${table.latitude} BETWEEN -90 AND 90`),
+    check(
+      'device_location_overrides_longitude_check',
+      sql`${table.longitude} BETWEEN -180 AND 180`
+    ),
   ]
 );
 
@@ -711,6 +741,14 @@ export const serverUsersRelations = relations(serverUsers, ({ one, many }) => ({
   sessions: many(sessions),
   rules: many(rules),
   violations: many(violations),
+  deviceLocationOverrides: many(deviceLocationOverrides),
+}));
+
+export const deviceLocationOverridesRelations = relations(deviceLocationOverrides, ({ one }) => ({
+  serverUser: one(serverUsers, {
+    fields: [deviceLocationOverrides.serverUserId],
+    references: [serverUsers.id],
+  }),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({

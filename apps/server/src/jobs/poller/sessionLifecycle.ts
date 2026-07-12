@@ -18,6 +18,7 @@ import {
 import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { serverUsers, sessions, violations } from '../../db/schema.js';
+import { resolveDeviceLocation } from '../../services/deviceLocationOverrides.js';
 import type { GeoLocation } from '../../services/geoip.js';
 import {
   evaluateRulesAsync,
@@ -99,6 +100,15 @@ export interface BuildActiveSessionInput {
     referenceId: string | null;
     watched: boolean;
     externalSessionId?: string | null;
+    geoCity?: string | null;
+    geoRegion?: string | null;
+    geoCountry?: string | null;
+    geoContinent?: string | null;
+    geoPostal?: string | null;
+    geoLat?: number | null;
+    geoLon?: number | null;
+    geoAsnNumber?: number | null;
+    geoAsnOrganization?: string | null;
   };
 
   /** Processed session data from media server (extends StreamDetailFields for DRY) */
@@ -171,6 +181,19 @@ export interface BuildActiveSessionInput {
  */
 export function buildActiveSession(input: BuildActiveSessionInput): ActiveSession {
   const { session, processed, user, geo, server, overrides } = input;
+  const persistedGeo = {
+    city: session.geoCity !== undefined ? session.geoCity : geo.city,
+    region: session.geoRegion !== undefined ? session.geoRegion : geo.region,
+    country:
+      session.geoCountry !== undefined ? session.geoCountry : (geo.countryCode ?? geo.country),
+    continent: session.geoContinent !== undefined ? session.geoContinent : geo.continent,
+    postal: session.geoPostal !== undefined ? session.geoPostal : geo.postal,
+    lat: session.geoLat !== undefined ? session.geoLat : geo.lat,
+    lon: session.geoLon !== undefined ? session.geoLon : geo.lon,
+    asnNumber: session.geoAsnNumber !== undefined ? session.geoAsnNumber : geo.asnNumber,
+    asnOrganization:
+      session.geoAsnOrganization !== undefined ? session.geoAsnOrganization : geo.asnOrganization,
+  };
 
   return {
     // Core identifiers
@@ -220,15 +243,15 @@ export function buildActiveSession(input: BuildActiveSessionInput): ActiveSessio
 
     // Network/device info
     ipAddress: processed.ipAddress,
-    geoCity: geo.city,
-    geoRegion: geo.region,
-    geoCountry: geo.countryCode ?? geo.country,
-    geoContinent: geo.continent,
-    geoPostal: geo.postal,
-    geoLat: geo.lat,
-    geoLon: geo.lon,
-    geoAsnNumber: geo.asnNumber,
-    geoAsnOrganization: geo.asnOrganization,
+    geoCity: persistedGeo.city,
+    geoRegion: persistedGeo.region,
+    geoCountry: persistedGeo.country,
+    geoContinent: persistedGeo.continent,
+    geoPostal: persistedGeo.postal,
+    geoLat: persistedGeo.lat,
+    geoLon: persistedGeo.lon,
+    geoAsnNumber: persistedGeo.asnNumber,
+    geoAsnOrganization: persistedGeo.asnOrganization,
     playerName: processed.playerName,
     deviceId: processed.deviceId || null,
     product: processed.product || null,
@@ -476,12 +499,13 @@ export async function createSessionWithRulesAtomic(
     processed,
     server,
     serverUser,
-    geo,
+    geo: ipGeo,
     activeRulesV2,
     activeSessions,
     recentSessions,
     preGeneratedId,
   } = input;
+  const geo = await resolveDeviceLocation(serverUser.id, processed.deviceId, ipGeo);
 
   let referenceId: string | null = null;
   let qualityChange: QualityChangeResult | null = null;

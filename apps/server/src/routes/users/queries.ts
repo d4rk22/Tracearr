@@ -1,8 +1,9 @@
 /** Shared User Query Functions **/
 
 import type { UserDevice } from '@tracearr/shared';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { db as defaultDb } from '../../db/client.js';
+import { deviceLocationOverrides } from '../../db/schema.js';
 
 // Accept either the default db or a transaction context
 type DbOrTx = typeof defaultDb;
@@ -28,14 +29,28 @@ export async function queryUserDevices(
   dbOrTx: DbOrTx,
   serverUserId: string
 ): Promise<UserDevice[]> {
-  const result = await dbOrTx.execute(sql`
-    SELECT DISTINCT ON (COALESCE(reference_id, id))
-      device_id, player_name, product, device, platform, started_at,
-      geo_city, geo_region, geo_country
-    FROM sessions
-    WHERE server_user_id = ${serverUserId}
-    ORDER BY COALESCE(reference_id, id), started_at DESC
-  `);
+  const [result, overrides] = await Promise.all([
+    dbOrTx.execute(sql`
+      SELECT DISTINCT ON (COALESCE(reference_id, id))
+        device_id, player_name, product, device, platform, started_at,
+        geo_city, geo_region, geo_country
+      FROM sessions
+      WHERE server_user_id = ${serverUserId}
+      ORDER BY COALESCE(reference_id, id), started_at DESC
+    `),
+    dbOrTx
+      .select({
+        deviceId: deviceLocationOverrides.deviceId,
+        city: deviceLocationOverrides.city,
+        region: deviceLocationOverrides.region,
+        country: deviceLocationOverrides.country,
+        latitude: deviceLocationOverrides.latitude,
+        longitude: deviceLocationOverrides.longitude,
+      })
+      .from(deviceLocationOverrides)
+      .where(eq(deviceLocationOverrides.serverUserId, serverUserId)),
+  ]);
+  const overridesByDeviceId = new Map(overrides.map((override) => [override.deviceId, override]));
 
   // Raw SQL returns timestamps as strings — coerce to Date for comparisons
   const sessionData = (result.rows as unknown as DeviceSessionRow[]).map((r) => ({
@@ -144,6 +159,7 @@ export async function queryUserDevices(
       locations: Array.from(dev.locationMap.values()).sort(
         (a, b) => b.lastSeenAt.getTime() - a.lastSeenAt.getTime()
       ),
+      locationOverride: dev.deviceId ? (overridesByDeviceId.get(dev.deviceId) ?? null) : null,
     }))
     .sort((a, b) => b.lastSeenAt.getTime() - a.lastSeenAt.getTime());
 }

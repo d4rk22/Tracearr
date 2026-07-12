@@ -1,3 +1,7 @@
+set -e
+
+. "$(dirname "$0")/corepack-pnpm.sh"
+
 pnpm typecheck
 pnpm test:unit
 pnpm lint

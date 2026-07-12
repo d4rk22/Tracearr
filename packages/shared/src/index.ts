@@ -18,6 +18,8 @@ export type {
   AuthUser,
   UserLocation,
   UserDevice,
+  DeviceLocationOverride,
+  DeviceLocationSearchResult,
   // Session
   SessionState,
   MediaType,

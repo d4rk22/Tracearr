@@ -14,15 +14,19 @@ import {
   Laptop,
   HardDrive,
   MapPin,
+  MapPinned,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { UserDevice } from '@tracearr/shared';
 import { formatLocationCompact } from '@/lib/utils';
+import { DeviceLocationOverrideDialog } from './DeviceLocationOverrideDialog';
 
 interface UserDevicesCardProps {
+  userId: string;
   devices: UserDevice[];
   isLoading?: boolean;
   totalSessions?: number;
+  canManageLocations?: boolean;
 }
 
 const INITIAL_DISPLAY_COUNT = 5;
@@ -117,8 +121,15 @@ function formatLocationShort(loc: {
   return formatLocationCompact(loc.city, loc.region, loc.country) ?? 'Unknown';
 }
 
-export function UserDevicesCard({ devices, isLoading, totalSessions = 0 }: UserDevicesCardProps) {
+export function UserDevicesCard({
+  userId,
+  devices,
+  isLoading,
+  totalSessions = 0,
+  canManageLocations = false,
+}: UserDevicesCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [locationDevice, setLocationDevice] = useState<UserDevice | null>(null);
 
   if (isLoading) {
     return (
@@ -255,10 +266,35 @@ export function UserDevicesCard({ devices, isLoading, totalSessions = 0 }: UserD
                           )}
                         </>
                       )}
+                      {device.locationOverride && (
+                        <>
+                          <span>·</span>
+                          <span className="text-primary flex items-center gap-1 font-medium">
+                            <MapPinned className="h-3 w-3 shrink-0" />
+                            Known: {formatLocationShort(device.locationOverride)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* Usage Percentage */}
+                  {canManageLocations && device.deviceId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="flex-shrink-0"
+                      aria-label={
+                        device.locationOverride
+                          ? `Edit known location for ${displayName}`
+                          : `Set known location for ${displayName}`
+                      }
+                      onClick={() => setLocationDevice(device)}
+                    >
+                      <MapPinned className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Badge variant="outline" className="flex-shrink-0 font-mono">
                     {percentage}%
                   </Badge>
@@ -291,6 +327,17 @@ export function UserDevicesCard({ devices, isLoading, totalSessions = 0 }: UserD
           )}
         </CardContent>
       </Card>
+      {locationDevice && (
+        <DeviceLocationOverrideDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setLocationDevice(null);
+          }}
+          userId={userId}
+          device={locationDevice}
+          deviceName={getDeviceDisplayName(locationDevice)}
+        />
+      )}
     </TooltipProvider>
   );
 }

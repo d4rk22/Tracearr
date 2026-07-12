@@ -57,6 +57,7 @@ export function UserDetail() {
   const { selectedServerId, servers } = useServer();
   const { user: authUser } = useAuth();
   const isOwner = authUser?.role === 'owner';
+  const canManageDeviceLocations = isOwner || authUser?.role === 'admin';
 
   // Column visibility for the sessions HistoryTable (hide user since we're scoped to one)
   const sessionColumnVisibility: ColumnVisibility = useMemo(
@@ -492,7 +493,13 @@ export function UserDetail() {
           isLoading={isLoading}
           totalSessions={sessionsTotal}
         />
-        <UserDevicesCard devices={devices} isLoading={isLoading} totalSessions={sessionsTotal} />
+        <UserDevicesCard
+          userId={id ?? ''}
+          devices={devices}
+          isLoading={isLoading}
+          totalSessions={sessionsTotal}
+          canManageLocations={canManageDeviceLocations}
+        />
       </div>
 
       {/* Recent Sessions */}

@@ -1112,6 +1112,19 @@ export interface DeviceLocation {
   lastSeenAt: Date;
 }
 
+export interface DeviceLocationOverride {
+  city: string;
+  region: string | null;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface DeviceLocationSearchResult extends DeviceLocationOverride {
+  id: number;
+  countryName: string;
+}
+
 // User device aggregation (derived from sessions)
 export interface UserDevice {
   deviceId: string | null;
@@ -1122,6 +1135,7 @@ export interface UserDevice {
   sessionCount: number;
   lastSeenAt: Date;
   locations: DeviceLocation[]; // Where this device has been used from
+  locationOverride: DeviceLocationOverride | null;
 }
 
 // API response types

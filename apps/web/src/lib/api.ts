@@ -17,6 +17,8 @@ import type {
   LocationStatsResponse,
   UserLocation,
   UserDevice,
+  DeviceLocationOverride,
+  DeviceLocationSearchResult,
   Settings,
   PaginatedResponse,
   MobileConfig,
@@ -642,6 +644,31 @@ class ApiClient {
     },
     devices: async (id: string) => {
       const response = await this.request<{ data: UserDevice[] }>(`/users/${id}/devices`);
+      return response.data;
+    },
+    deviceLocation: async (id: string, deviceId: string) => {
+      const response = await this.request<{ data: DeviceLocationOverride | null }>(
+        `/users/${id}/devices/${encodeURIComponent(deviceId)}/location`
+      );
+      return response.data;
+    },
+    setDeviceLocation: async (id: string, deviceId: string, location: DeviceLocationOverride) => {
+      const response = await this.request<{ data: DeviceLocationOverride }>(
+        `/users/${id}/devices/${encodeURIComponent(deviceId)}/location`,
+        { method: 'PUT', body: JSON.stringify(location) }
+      );
+      return response.data;
+    },
+    clearDeviceLocation: (id: string, deviceId: string) =>
+      this.request<{ success: boolean }>(
+        `/users/${id}/devices/${encodeURIComponent(deviceId)}/location`,
+        { method: 'DELETE' }
+      ),
+    searchDeviceLocations: async (id: string, query: string) => {
+      const params = new URLSearchParams({ q: query });
+      const response = await this.request<{ data: DeviceLocationSearchResult[] }>(
+        `/users/${id}/devices/location-search?${params.toString()}`
+      );
       return response.data;
     },
     terminations: (id: string, params?: { page?: number; pageSize?: number }) => {
