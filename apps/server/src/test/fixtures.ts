@@ -96,6 +96,8 @@ export function createMockSession(overrides: Partial<Session> = {}): Session {
     trackNumber: null,
     discNumber: null,
     ...overrides,
+    isLocal: overrides.isLocal === undefined ? true : overrides.isLocal,
+    connectionKind: overrides.connectionKind === undefined ? 'direct' : overrides.connectionKind,
   };
 }
 
@@ -179,6 +181,8 @@ export function createMockActiveSession(overrides: Partial<ActiveSession> = {}):
     canTerminate: overrides.canTerminate ?? true,
     // Apply overrides last to allow stream detail overrides
     ...overrides,
+    isLocal: overrides.isLocal === undefined ? true : overrides.isLocal,
+    connectionKind: overrides.connectionKind === undefined ? 'direct' : overrides.connectionKind,
   };
 }
 

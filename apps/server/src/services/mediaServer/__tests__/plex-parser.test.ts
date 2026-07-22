@@ -25,6 +25,8 @@ import {
   parseMediaMetadataResponse,
   parseLibraryItemsResponse,
   getTranscodingSessionRatingKeys,
+  parsePlexConnectionKind,
+  parsePlexIsLocal,
   type PlexOriginalMedia,
 } from '../plex/parser.js';
 
@@ -33,6 +35,32 @@ import {
 // ============================================================================
 
 describe('Plex Session Parser', () => {
+  describe('connection classification', () => {
+    it('classifies only explicit Plex relayed values', () => {
+      expect(parsePlexConnectionKind(true)).toBe('relay');
+      expect(parsePlexConnectionKind(1)).toBe('relay');
+      expect(parsePlexConnectionKind('1')).toBe('relay');
+      expect(parsePlexConnectionKind(false)).toBe('direct');
+      expect(parsePlexConnectionKind(0)).toBe('direct');
+      expect(parsePlexConnectionKind('0')).toBe('direct');
+    });
+
+    it('does not guess direct when Plex omits or malforms relayed', () => {
+      expect(parsePlexConnectionKind(undefined)).toBe('unknown');
+      expect(parsePlexConnectionKind(null)).toBe('unknown');
+      expect(parsePlexConnectionKind('unexpected')).toBe('unknown');
+    });
+
+    it('preserves only explicit Plex locality values', () => {
+      expect(parsePlexIsLocal(true)).toBe(true);
+      expect(parsePlexIsLocal(1)).toBe(true);
+      expect(parsePlexIsLocal('0')).toBe(false);
+      expect(parsePlexIsLocal(false)).toBe(false);
+      expect(parsePlexIsLocal(undefined)).toBeNull();
+      expect(parsePlexIsLocal('unexpected')).toBeNull();
+    });
+  });
+
   describe('parseSession', () => {
     it('should parse a movie session', () => {
       const rawSession = {
@@ -77,6 +105,7 @@ describe('Plex Session Parser', () => {
       expect(session.player.deviceId).toBe('device-uuid-123');
       expect(session.network.ipAddress).toBe('192.168.1.100'); // Uses local IP when local=true
       expect(session.network.isLocal).toBe(true);
+      expect(session.network.connectionKind).toBe('unknown');
       expect(session.quality.bitrate).toBe(8000);
       expect(session.quality.isTranscode).toBe(false);
       expect(session.episode).toBeUndefined();

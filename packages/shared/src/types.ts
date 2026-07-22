@@ -148,6 +148,7 @@ export interface AuthUser {
 
 // Session types
 export type SessionState = 'playing' | 'paused' | 'stopped';
+export type ConnectionKind = 'direct' | 'relay' | 'unknown';
 
 /** Supported media types */
 export const MEDIA_TYPES = [
@@ -299,6 +300,10 @@ export interface Session extends StreamDetailFields {
   watched: boolean; // True if user watched 80%+ of content
   // Network and device info
   ipAddress: string;
+  /** Whether the media server explicitly reported the client as local. */
+  isLocal: boolean | null;
+  /** Plex relay classification; null on historical rows written before this field existed. */
+  connectionKind: ConnectionKind | null;
   geoCity: string | null;
   geoRegion: string | null; // State/province/subdivision
   geoCountry: string | null;

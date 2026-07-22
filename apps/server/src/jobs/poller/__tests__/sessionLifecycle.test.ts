@@ -9,6 +9,86 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
+describe('active-session network preservation', () => {
+  it('carries locality and relay classification into the pending live cache object', async () => {
+    const { buildPendingActiveSession } = await import('../sessionLifecycle.js');
+    const active = buildPendingActiveSession({
+      id: '11111111-1111-4111-8111-111111111111',
+      confirmation: {
+        rulesEvaluated: false,
+        confirmedPlayback: false,
+        firstSeenAt: 1,
+        maxViewOffset: 1,
+      },
+      processed: {
+        sessionKey: 'session-key',
+        state: 'playing',
+        mediaType: 'movie',
+        mediaTitle: 'hidden from private contract',
+        grandparentTitle: '',
+        seasonNumber: 0,
+        episodeNumber: 0,
+        year: 2026,
+        thumbPath: '',
+        ratingKey: 'rating-key',
+        totalDurationMs: 1,
+        progressMs: 1,
+        ipAddress: '203.0.113.10',
+        isLocal: false,
+        connectionKind: 'relay',
+        playerName: '',
+        deviceId: '',
+        product: '',
+        device: '',
+        platform: '',
+        quality: '',
+        isTranscode: false,
+        videoDecision: 'directplay',
+        audioDecision: 'directplay',
+        bitrate: 1,
+        channelTitle: null,
+        channelIdentifier: null,
+        channelThumb: null,
+        artistName: null,
+        albumName: null,
+        trackNumber: null,
+        discNumber: null,
+      } as never,
+      server: { id: 'server-1', name: 'Plex', type: 'plex' },
+      serverUser: {
+        id: 'server-user-1',
+        username: 'user',
+        thumbUrl: null,
+        identityName: null,
+        trustScore: 100,
+        sessionCount: 1,
+        lastActivityAt: null,
+        createdAt: new Date(),
+      },
+      geo: {
+        city: null,
+        region: null,
+        country: null,
+        countryCode: null,
+        continent: null,
+        postal: null,
+        lat: null,
+        lon: null,
+        asnNumber: null,
+        asnOrganization: null,
+      },
+      startedAt: 1,
+      lastSeenAt: 1,
+      currentState: 'playing',
+      pausedDurationMs: 0,
+      lastPausedAt: null,
+    });
+
+    expect(active.isLocal).toBe(false);
+    expect(active.connectionKind).toBe('relay');
+  });
+});
+
 // ============================================================================
 // 1. Distributed Lock Tests (withSessionCreateLock)
 // ============================================================================

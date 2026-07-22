@@ -142,6 +142,10 @@ export interface ProcessedSession extends StreamDetailFields {
   // Connection info
   /** Client IP address */
   ipAddress: string;
+  /** Whether the upstream explicitly reports this client as local. */
+  isLocal: boolean | null;
+  /** Direct/relay classification, or unknown when the upstream cannot prove it. */
+  connectionKind: 'direct' | 'relay' | 'unknown';
   /** Player/device name */
   playerName: string;
   /** Unique device identifier */

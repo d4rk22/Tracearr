@@ -108,6 +108,7 @@ const mockCacheService = {
   setPendingSession: vi.fn(),
   deletePendingSession: vi.fn(),
   getAllPendingSessionKeys: vi.fn().mockResolvedValue([]),
+  setServerLastSuccessfulPollAt: vi.fn(),
 };
 
 const mockPubSubService = {

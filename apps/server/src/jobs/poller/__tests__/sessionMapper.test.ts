@@ -55,6 +55,7 @@ function createBaseMediaSession(overrides: Partial<MediaSession> = {}): MediaSes
     network: {
       ipAddress: '192.168.1.100',
       isLocal: true,
+      connectionKind: 'direct',
     },
     quality: {
       bitrate: 20000,
@@ -467,6 +468,8 @@ describe('sessionMapper', () => {
         expect(result.totalDurationMs).toBe(5400000);
         expect(result.progressMs).toBe(2700000);
         expect(result.ipAddress).toBe('8.8.8.8');
+        expect(result.isLocal).toBe(false);
+        expect(result.connectionKind).toBe('unknown');
         expect(result.isTranscode).toBe(true);
         expect(result.videoDecision).toBe('transcode');
         expect(result.audioDecision).toBe('copy');

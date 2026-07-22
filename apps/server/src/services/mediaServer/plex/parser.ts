@@ -93,6 +93,27 @@ export interface PlexRawSession {
   sourceTitle?: unknown; // Channel name for Live TV
 }
 
+/**
+ * Plex exposes Player.relayed on session responses. Only classify a connection
+ * when that flag is explicitly present and recognizable; missing or malformed
+ * values must remain unknown rather than being guessed as direct.
+ */
+export function parsePlexConnectionKind(relayed: unknown): 'direct' | 'relay' | 'unknown' {
+  if (relayed === true || relayed === 1 || relayed === '1' || relayed === 'true') {
+    return 'relay';
+  }
+  if (relayed === false || relayed === 0 || relayed === '0' || relayed === 'false') {
+    return 'direct';
+  }
+  return 'unknown';
+}
+
+export function parsePlexIsLocal(local: unknown): boolean | null {
+  if (local === true || local === 1 || local === '1' || local === 'true') return true;
+  if (local === false || local === 0 || local === '0' || local === 'false') return false;
+  return null;
+}
+
 // ============================================================================
 // Stream Detail Extraction
 // ============================================================================
@@ -667,6 +688,7 @@ export function parseSession(
   originalMedia?: PlexOriginalMedia | null
 ): MediaSession {
   const player = (item.Player as Record<string, unknown>) ?? {};
+  const isLocal = parsePlexIsLocal(player.local);
   const user = (item.User as Record<string, unknown>) ?? {};
   const sessionInfo = (item.Session as Record<string, unknown>) ?? {};
   const transcodeSession = item.TranscodeSession as Record<string, unknown> | undefined;
@@ -797,10 +819,12 @@ export function parseSession(
     network: {
       // For local streams, use local address so GeoIP correctly identifies as "Local"
       // For remote streams, prefer public IP for accurate geo-location
-      ipAddress: parseBoolean(player.local)
-        ? parseString(player.address)
-        : parseString(player.remotePublicAddress) || parseString(player.address),
-      isLocal: parseBoolean(player.local),
+      ipAddress:
+        isLocal === true
+          ? parseString(player.address)
+          : parseString(player.remotePublicAddress) || parseString(player.address),
+      isLocal,
+      connectionKind: parsePlexConnectionKind(player.relayed),
     },
     quality: {
       bitrate,
