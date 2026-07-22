@@ -319,6 +319,11 @@ export const sessions = pgTable(
     forceStopped: boolean('force_stopped').notNull().default(false), // True if session was force-stopped due to inactivity
     shortSession: boolean('short_session').notNull().default(false), // True if session duration < MIN_PLAY_TIME_MS (120s)
     ipAddress: varchar('ip_address', { length: 45 }).notNull(),
+    // Nullable so pre-migration history is represented as unknown, never guessed.
+    isLocal: boolean('is_local'),
+    connectionKind: varchar('connection_kind', { length: 20 }).$type<
+      'direct' | 'relay' | 'unknown'
+    >(),
     geoCity: varchar('geo_city', { length: 255 }),
     geoRegion: varchar('geo_region', { length: 255 }), // State/province/subdivision
     geoCountry: varchar('geo_country', { length: 100 }),
@@ -404,6 +409,10 @@ export const sessions = pgTable(
     index('idx_sessions_server_date_ref').on(table.serverId, table.startedAt, table.referenceId),
     // Index for stale session detection (active sessions that haven't been seen recently)
     index('sessions_stale_detection_idx').on(table.lastSeenAt, table.stoppedAt),
+    check(
+      'sessions_connection_kind_check',
+      sql`${table.connectionKind} IS NULL OR ${table.connectionKind} IN ('direct', 'relay', 'unknown')`
+    ),
   ]
 );
 

@@ -117,6 +117,10 @@ function createMockRedis(): Redis & {
     ttls,
     // String operations
     get: vi.fn(async (key: string) => store.get(key) ?? null),
+    set: vi.fn(async (key: string, value: string) => {
+      store.set(key, value);
+      return 'OK';
+    }),
     setex: vi.fn(async (key: string, seconds: number, value: string) => {
       store.set(key, value);
       ttls.set(key, seconds);
@@ -456,6 +460,30 @@ describe('CacheService', () => {
 
       const result = await cache.getUserSessions('user-123');
       expect(result).toEqual(['session-1']);
+    });
+  });
+
+  describe('server poll freshness', () => {
+    it('returns null until a successful poll is recorded', async () => {
+      await expect(cache.getServerLastSuccessfulPollAt('srv-1')).resolves.toBeNull();
+    });
+
+    it('stores the exact successful poll observation without a TTL', async () => {
+      const polledAt = new Date('2026-07-22T12:34:56.789Z');
+
+      await cache.setServerLastSuccessfulPollAt('srv-1', polledAt);
+
+      await expect(cache.getServerLastSuccessfulPollAt('srv-1')).resolves.toEqual(polledAt);
+      expect(redis.set).toHaveBeenCalledWith(
+        'tracearr:servers:srv-1:last-successful-poll',
+        polledAt.toISOString()
+      );
+      expect(redis.ttls.has('tracearr:servers:srv-1:last-successful-poll')).toBe(false);
+    });
+
+    it('treats malformed cached timestamps as unavailable', async () => {
+      redis.store.set('tracearr:servers:srv-1:last-successful-poll', 'not-a-date');
+      await expect(cache.getServerLastSuccessfulPollAt('srv-1')).resolves.toBeNull();
     });
   });
 

@@ -62,6 +62,7 @@ import { channelRoutingRoutes } from './routes/channelRouting.js';
 import { versionRoutes } from './routes/version.js';
 import { maintenanceRoutes } from './routes/maintenance.js';
 import { publicRoutes } from './routes/public.js';
+import { homeAccessRoutes } from './routes/internal/homeAccess.js';
 import { libraryRoutes } from './routes/library.js';
 import { tailscaleRoutes } from './routes/tailscale.js';
 import { tasksRoutes } from './routes/tasks.js';
@@ -266,6 +267,14 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
     origin: process.env.CORS_ORIGIN || true,
     credentials: true,
   });
+  // Must run before the global rate-limit hook so even 429 responses from the
+  // private Home-access surface can never be cached by an intermediary.
+  app.addHook('onRequest', (request, reply, done) => {
+    if (request.url.includes('/api/v1/internal/home-access/')) {
+      reply.header('Cache-Control', 'no-store');
+    }
+    done();
+  });
   await app.register(rateLimit, {
     max: 1000,
     timeWindow: '1 minute',
@@ -392,6 +401,7 @@ async function buildApp(options: { trustProxy?: boolean } = {}) {
   await app.register(tailscaleRoutes, { prefix: `${API_BASE_PATH}/tailscale` });
   await app.register(tasksRoutes, { prefix: `${API_BASE_PATH}/tasks` });
   await app.register(publicRoutes, { prefix: `${API_BASE_PATH}/public` });
+  await app.register(homeAccessRoutes, { prefix: `${API_BASE_PATH}/internal/home-access` });
   await app.register(libraryRoutes, { prefix: `${API_BASE_PATH}/library` });
   await app.register(backupRoutes, { prefix: `${API_BASE_PATH}/backup` });
 

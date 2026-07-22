@@ -132,6 +132,8 @@ export const REDIS_KEYS = {
   SERVER_HEALTH: (serverId: string) => `${_redisPrefix}tracearr:servers:${serverId}:health`,
   SERVER_HEALTH_FAIL_COUNT: (serverId: string) =>
     `${_redisPrefix}tracearr:servers:${serverId}:health:fails`,
+  SERVER_LAST_SUCCESSFUL_POLL: (serverId: string) =>
+    `${_redisPrefix}tracearr:servers:${serverId}:last-successful-poll`,
   SERVER_CONNECTION: (serverId: string) => `${_redisPrefix}tracearr:servers:${serverId}:connection`,
   get PUBSUB_EVENTS() {
     return `${_redisPrefix}tracearr:events`;

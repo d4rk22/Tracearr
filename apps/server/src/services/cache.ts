@@ -44,6 +44,8 @@ export interface CacheService {
   // Server health tracking
   getServerHealth(serverId: string): Promise<boolean | null>;
   setServerHealth(serverId: string, isHealthy: boolean): Promise<void>;
+  getServerLastSuccessfulPollAt(serverId: string): Promise<Date | null>;
+  setServerLastSuccessfulPollAt(serverId: string, polledAt: Date): Promise<void>;
   incrServerFailCount(serverId: string): Promise<number>;
   resetServerFailCount(serverId: string): Promise<void>;
 
@@ -409,6 +411,18 @@ export function createCacheService(redis: Redis): CacheService {
         CACHE_TTL.SERVER_HEALTH,
         isHealthy ? 'true' : 'false'
       );
+    },
+
+    async getServerLastSuccessfulPollAt(serverId: string): Promise<Date | null> {
+      const value = await redis.get(REDIS_KEYS.SERVER_LAST_SUCCESSFUL_POLL(serverId));
+      if (!value) return null;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    },
+
+    async setServerLastSuccessfulPollAt(serverId: string, polledAt: Date): Promise<void> {
+      // No TTL: the value is an observation timestamp, not a liveness assertion.
+      await redis.set(REDIS_KEYS.SERVER_LAST_SUCCESSFUL_POLL(serverId), polledAt.toISOString());
     },
 
     async incrServerFailCount(serverId: string): Promise<number> {

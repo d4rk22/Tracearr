@@ -33,6 +33,7 @@ import {
   type SubtitleInfo,
   type TranscodeInfo,
 } from '@tracearr/shared';
+import { isIP } from 'node:net';
 import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
@@ -62,6 +63,39 @@ interface StreamCodecData {
   sourceVideoHeight: number | null;
   streamVideoCodec: string | null;
   streamAudioCodec: string | null;
+}
+
+const RAW_IP_FIELD_NAMES = new Set([
+  'ip',
+  'ipaddress',
+  'ipaddresses',
+  'clientip',
+  'sourceip',
+  'remoteip',
+  'previousip',
+  'currentip',
+]);
+
+/**
+ * Defense-in-depth for every public JSON response. Public DTOs already omit
+ * network identifiers explicitly, but violation evidence is extensible JSON
+ * and can contain nested IP fields produced by rule evaluators.
+ */
+export function sanitizePublicPayload(value: unknown): unknown {
+  if (typeof value === 'string') return isIP(value) ? undefined : value;
+  if (value === null || typeof value !== 'object' || value instanceof Date) return value;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizePublicPayload(item)).filter((item) => item !== undefined);
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (RAW_IP_FIELD_NAMES.has(key.toLowerCase())) continue;
+    const next = sanitizePublicPayload(item);
+    if (next !== undefined) sanitized[key] = next;
+  }
+  return sanitized;
 }
 
 function formatDisplayValues(data: StreamCodecData) {
@@ -163,6 +197,10 @@ function paginatedResponse<T>(
 }
 
 export const publicRoutes: FastifyPluginAsync = async (app) => {
+  app.addHook('preSerialization', async (_request, _reply, payload) =>
+    sanitizePublicPayload(payload)
+  );
+
   /**
    * GET /docs - OpenAPI 3.0 specification
    * No authentication required - allows integrations to discover the API

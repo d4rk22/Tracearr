@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { isIP } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockActiveSession } from '../../test/fixtures.js';
 
@@ -21,12 +22,34 @@ vi.mock('../../services/cache.js', () => ({
   })),
 }));
 
-import { publicRoutes } from '../public.js';
+import { publicRoutes, sanitizePublicPayload } from '../public.js';
+
+function expectNoRawIp(value: unknown): void {
+  if (typeof value === 'string') {
+    expect(isIP(value)).toBe(0);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(expectNoRawIp);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, item] of Object.entries(value)) {
+      expect(key.toLowerCase()).not.toMatch(
+        /^(ip|ipaddress|ipaddresses|clientip|sourceip|remoteip|previousip|currentip)$/
+      );
+      expectNoRawIp(item);
+    }
+  }
+}
 
 async function buildTestApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
 
-  app.decorate('authenticatePublicApi', vi.fn(async () => undefined));
+  app.decorate(
+    'authenticatePublicApi',
+    vi.fn(async () => undefined)
+  );
   await app.register(publicRoutes, { prefix: '/api/v1/public' });
 
   return app;
@@ -75,6 +98,7 @@ describe('Public API Routes', () => {
       expect(body.data[0]).not.toHaveProperty('geoLat');
       expect(body.data[0]).not.toHaveProperty('geoLon');
       expect(body.data[0]).not.toHaveProperty('ipAddress');
+      expectNoRawIp(body);
     });
 
     it('includes sanitized location fields when requested', async () => {
@@ -108,6 +132,24 @@ describe('Public API Routes', () => {
         geoLon: -96.7026,
       });
       expect(body.data[0]).not.toHaveProperty('ipAddress');
+      expectNoRawIp(body);
     });
+  });
+
+  it('recursively removes raw IPs from extensible public payloads', () => {
+    const result = sanitizePublicPayload({
+      safe: 'kept',
+      ipAddress: '203.0.113.10',
+      evidence: {
+        previousIp: '198.51.100.2',
+        values: ['allowed', '2001:db8::1', { sourceIp: '192.0.2.4', count: 2 }],
+      },
+    });
+
+    expect(result).toEqual({
+      safe: 'kept',
+      evidence: { values: ['allowed', { count: 2 }] },
+    });
+    expectNoRawIp(result);
   });
 });

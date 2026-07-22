@@ -176,6 +176,8 @@ export function mapMediaSession(
     discNumber: session.music?.discNumber ?? null,
     // Connection info
     ipAddress,
+    isLocal: session.network.isLocal,
+    connectionKind: session.network.connectionKind ?? 'unknown',
     playerName: session.player.name?.slice(0, 255) ?? '',
     deviceId: session.player.deviceId?.slice(0, 255),
     product: session.player.product?.slice(0, 255) ?? '',
@@ -236,6 +238,8 @@ export function mapSessionRow(s: typeof sessions.$inferSelect): Session {
     referenceId: s.referenceId,
     watched: s.watched,
     ipAddress: s.ipAddress,
+    isLocal: s.isLocal,
+    connectionKind: s.connectionKind,
     geoCity: s.geoCity,
     geoRegion: s.geoRegion,
     geoCountry: s.geoCountry,

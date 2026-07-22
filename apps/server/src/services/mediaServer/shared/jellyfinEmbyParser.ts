@@ -212,6 +212,8 @@ export function parseSessionCore(
     network: {
       ipAddress: extractIpFromEndpoint(parseString(session.RemoteEndPoint)),
       isLocal: false,
+      // Jellyfin/Emby session payloads do not expose a reliable relay/direct flag.
+      connectionKind: 'unknown',
     },
     quality: {
       bitrate: getBitrate(session),

@@ -128,6 +128,8 @@ export interface BuildActiveSessionInput {
     totalDurationMs: number;
     progressMs: number;
     ipAddress: string;
+    isLocal: boolean | null;
+    connectionKind: 'direct' | 'relay' | 'unknown';
     playerName: string;
     deviceId: string;
     product: string;
@@ -243,6 +245,8 @@ export function buildActiveSession(input: BuildActiveSessionInput): ActiveSessio
 
     // Network/device info
     ipAddress: processed.ipAddress,
+    isLocal: processed.isLocal,
+    connectionKind: processed.connectionKind,
     geoCity: persistedGeo.city,
     geoRegion: persistedGeo.region,
     geoCountry: persistedGeo.country,
@@ -342,6 +346,8 @@ export function buildPendingActiveSession(pendingData: PendingSessionData): Acti
 
     // Network/device info
     ipAddress: processed.ipAddress,
+    isLocal: processed.isLocal,
+    connectionKind: processed.connectionKind,
     geoCity: geo.city,
     geoRegion: geo.region,
     geoCountry: geo.countryCode ?? geo.country,
@@ -650,6 +656,8 @@ export async function createSessionWithRulesAtomic(
               referenceId,
               watched: false,
               ipAddress: processed.ipAddress,
+              isLocal: processed.isLocal,
+              connectionKind: processed.connectionKind,
               geoCity: geo.city,
               geoRegion: geo.region,
               geoCountry: geo.countryCode ?? geo.country,
@@ -721,6 +729,8 @@ export async function createSessionWithRulesAtomic(
             referenceId: inserted.referenceId,
             watched: inserted.watched,
             ipAddress: processed.ipAddress,
+            isLocal: processed.isLocal,
+            connectionKind: processed.connectionKind,
             geoCity: geo.city,
             geoRegion: geo.region,
             geoCountry: geo.countryCode ?? geo.country,
@@ -1386,6 +1396,8 @@ export async function reEvaluateRulesOnTranscodeChange(
     referenceId: existingSession.referenceId,
     watched: existingSession.watched,
     ipAddress: existingSession.ipAddress,
+    isLocal: existingSession.isLocal,
+    connectionKind: existingSession.connectionKind,
     geoCity: existingSession.geoCity,
     geoRegion: existingSession.geoRegion,
     geoCountry: existingSession.geoCountry,
@@ -1608,6 +1620,8 @@ export async function reEvaluateRulesOnPauseState(
     referenceId: existingSession.referenceId,
     watched: existingSession.watched,
     ipAddress: existingSession.ipAddress,
+    isLocal: existingSession.isLocal,
+    connectionKind: existingSession.connectionKind,
     geoCity: existingSession.geoCity,
     geoRegion: existingSession.geoRegion,
     geoCountry: existingSession.geoCountry,

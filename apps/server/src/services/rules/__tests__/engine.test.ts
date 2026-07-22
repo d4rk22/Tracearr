@@ -91,6 +91,8 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
     transcodeInfo: null,
     subtitleInfo: null,
     ...overrides,
+    isLocal: overrides.isLocal === undefined ? true : overrides.isLocal,
+    connectionKind: overrides.connectionKind === undefined ? 'direct' : overrides.connectionKind,
   };
 }
 

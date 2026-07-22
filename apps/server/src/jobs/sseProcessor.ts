@@ -703,6 +703,9 @@ async function fetchFullSession(
     });
 
     const allSessions = await client.getSessions();
+    // This is a successful full /status/sessions fetch, so it is a trustworthy
+    // poll timestamp even though it was triggered by an SSE event.
+    await cacheService?.setServerLastSuccessfulPollAt(serverId, new Date());
     const targetSession = allSessions.find((s) => s.sessionKey === sessionKey);
 
     if (!targetSession) {
@@ -1021,6 +1024,8 @@ async function updateExistingSession(
   // Build update payload
   const updatePayload: Partial<typeof sessions.$inferInsert> = {
     state: newState,
+    isLocal: processed.isLocal,
+    connectionKind: processed.connectionKind,
     quality: processed.quality,
     bitrate: processed.bitrate,
     progressMs: processed.progressMs || null,
@@ -1176,6 +1181,8 @@ async function updateExistingSession(
 
     if (cached) {
       cached.state = newState;
+      cached.isLocal = processed.isLocal;
+      cached.connectionKind = processed.connectionKind;
       cached.quality = processed.quality;
       cached.bitrate = processed.bitrate;
       cached.progressMs = processed.progressMs || null;

@@ -112,8 +112,10 @@ export interface MediaSession {
   network: {
     /** Client IP address (prefer public IP for geo) */
     ipAddress: string;
-    /** Whether client is on local network */
-    isLocal: boolean;
+    /** Whether client is on local network, or null when upstream did not report it reliably. */
+    isLocal: boolean | null;
+    /** Explicit connection classification when the upstream exposes one. */
+    connectionKind?: 'direct' | 'relay' | 'unknown';
   };
 
   /** Stream quality information */

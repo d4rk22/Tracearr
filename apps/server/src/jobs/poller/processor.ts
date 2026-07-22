@@ -25,6 +25,7 @@ import { type GeoLocation } from '../../services/geoip.js';
 import { createMediaServerClient } from '../../services/mediaServer/index.js';
 import { lookupGeoIP } from '../../services/plexGeoip.js';
 import { registerService, unregisterService } from '../../services/serviceTracker.js';
+import { recordSuccessfulPoll } from '../../services/serverPollFreshness.js';
 import { sseManager } from '../../services/sseManager.js';
 
 import { enqueueNotification } from '../notificationQueue.js';
@@ -973,6 +974,8 @@ async function processServerSessions(
         // Build base update payload
         const updatePayload: Partial<typeof sessions.$inferInsert> = {
           state: newState,
+          isLocal: processed.isLocal,
+          connectionKind: processed.connectionKind,
           quality: processed.quality,
           bitrate: processed.bitrate,
           progressMs: processed.progressMs || null,
@@ -1232,6 +1235,7 @@ async function pollServers(): Promise<void> {
       if (cacheService) {
         if (success) {
           const wasDown = wasHealthy === false;
+          await recordSuccessfulPoll(cacheService, server.id, success);
           await cacheService.setServerHealth(server.id, true);
           await cacheService.resetServerFailCount(server.id);
 
